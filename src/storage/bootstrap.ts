@@ -42,6 +42,7 @@ export async function resetDatabase(db: AppDatabase): Promise<void> {
   await Promise.all([
     db.policies.clear(),
     db.coverageItems.clear(),
+    db.policyDocuments.clear(),
     db.proposals.clear(),
     db.auditEntries.clear(),
     db.outboundRequests.clear(),

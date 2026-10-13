@@ -8,6 +8,10 @@ import { Hono } from 'hono';
  * (NFR-5, NFR-6). The payload it receives has already passed through
  * `src/gate/gate.ts`.
  *
+ * It also translates between the app's own message and tool shapes and the
+ * OpenAI-compatible chat-completions format, so provider details stay next to
+ * the provider key and out of the browser.
+ *
  * Deployment: one serverless function. `npm run relay:dev` runs it locally.
  */
 export interface RelayBindings {
@@ -19,9 +23,130 @@ export interface RelayBindings {
   MODEL_ID?: string;
 }
 
+export interface RelayMessage {
+  role: string;
+  content: string;
+  /** Tool name, on tool results. */
+  name?: string;
+  /** Tool calls the assistant made in this message. */
+  toolCalls?: Array<{ name: string; arguments: unknown }>;
+}
+
+export interface RelayTool {
+  name: string;
+  description: string;
+  /** Parameter name to a short type hint: "string", "number?", "string[]". */
+  parameters: Record<string, string>;
+}
+
 export interface RelayRequestBody {
-  messages: Array<{ role: string; content: string; name?: string }>;
-  tools?: Array<{ name: string; description: string; parameters: Record<string, string> }>;
+  messages: RelayMessage[];
+  tools?: RelayTool[];
+}
+
+/* ---------------------------------------------------- provider translation */
+
+/**
+ * The app's tool names contain dots ("earmark.create"), which the
+ * chat-completions format does not allow in a function name.
+ */
+export function toProviderToolName(name: string): string {
+  return name.replace(/\./g, '__');
+}
+
+export function fromProviderToolName(name: string): string {
+  return name.replace(/__/g, '.');
+}
+
+function parameterSchema(hint: string): Record<string, unknown> {
+  const base = hint.replace(/\?$/, '');
+  if (base === 'number') return { type: 'integer' };
+  if (base === 'string[]') return { type: 'array', items: { type: 'string' } };
+  // Anything else ("string", "YYYY-MM-DD", "friendly | firm") is a string with the hint as its description.
+  return base === 'string' ? { type: 'string' } : { type: 'string', description: base };
+}
+
+export function toProviderTools(tools: readonly RelayTool[]): unknown[] {
+  return tools.map((tool) => ({
+    type: 'function',
+    function: {
+      name: toProviderToolName(tool.name),
+      description: tool.description,
+      parameters: {
+        type: 'object',
+        properties: Object.fromEntries(
+          Object.entries(tool.parameters).map(([key, hint]) => [key, parameterSchema(hint)]),
+        ),
+        required: Object.entries(tool.parameters)
+          .filter(([, hint]) => !hint.endsWith('?'))
+          .map(([key]) => key),
+      },
+    },
+  }));
+}
+
+/**
+ * Chat-completions messages. Each tool result must name the call it answers, so
+ * calls are numbered in order and results are matched to them in order.
+ */
+export function toProviderMessages(messages: readonly RelayMessage[]): unknown[] {
+  const output: unknown[] = [];
+  const unanswered: string[] = [];
+  let counter = 0;
+
+  for (const message of messages) {
+    if (message.role === 'assistant' && message.toolCalls && message.toolCalls.length > 0) {
+      const calls = message.toolCalls.map((call) => {
+        counter += 1;
+        const id = `call_${counter}`;
+        unanswered.push(id);
+        return {
+          id,
+          type: 'function',
+          function: { name: toProviderToolName(call.name), arguments: JSON.stringify(call.arguments ?? {}) },
+        };
+      });
+      output.push({ role: 'assistant', content: message.content, tool_calls: calls });
+    } else if (message.role === 'tool') {
+      const id = unanswered.shift();
+      // A tool result with no call to answer cannot be expressed; pass it as plain text.
+      output.push(
+        id
+          ? { role: 'tool', tool_call_id: id, content: message.content }
+          : { role: 'user', content: `Tool result (${message.name ?? 'unknown'}): ${message.content}` },
+      );
+    } else {
+      output.push({ role: message.role, content: message.content });
+    }
+  }
+  return output;
+}
+
+interface ProviderToolCall {
+  function?: { name?: unknown; arguments?: unknown };
+}
+
+export function fromProviderToolCalls(raw: unknown): Array<{ name: string; arguments: unknown }> {
+  if (!Array.isArray(raw)) return [];
+  const calls: Array<{ name: string; arguments: unknown }> = [];
+  for (const entry of raw as ProviderToolCall[]) {
+    const name = entry.function?.name;
+    if (typeof name !== 'string' || name === '') continue;
+    let parsed: unknown = {};
+    const rawArguments = entry.function?.arguments;
+    if (typeof rawArguments === 'string' && rawArguments.trim() !== '') {
+      try {
+        parsed = JSON.parse(rawArguments);
+      } catch {
+        // Arguments that are not JSON are dropped; the tool then refuses the empty call.
+        parsed = {};
+      }
+    } else if (rawArguments !== null && typeof rawArguments === 'object') {
+      parsed = rawArguments;
+    }
+    calls.push({ name: fromProviderToolName(name), arguments: parsed });
+  }
+  return calls;
 }
 
 export const DEFAULT_MODEL_API_URL = 'https://api.example.invalid/v1/chat/completions';
@@ -74,8 +199,8 @@ app.post('/api/model', async (c) => {
     },
     body: JSON.stringify({
       model: readBinding(c.env, 'MODEL_ID') ?? 'default',
-      messages: body.messages,
-      ...(body.tools ? { tools: body.tools } : {}),
+      messages: toProviderMessages(body.messages),
+      ...(body.tools && body.tools.length > 0 ? { tools: toProviderTools(body.tools) } : {}),
     }),
   });
 
@@ -90,7 +215,7 @@ app.post('/api/model', async (c) => {
   return c.json({
     model: readBinding(c.env, 'MODEL_ID') ?? 'default',
     content: reply.choices?.[0]?.message?.content ?? '',
-    toolCalls: reply.choices?.[0]?.message?.tool_calls ?? [],
+    toolCalls: fromProviderToolCalls(reply.choices?.[0]?.message?.tool_calls),
   });
 });
 

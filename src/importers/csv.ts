@@ -2,6 +2,7 @@ import { randomId } from '../domain/ids';
 import { parseRupiah, type Money } from '../domain/money';
 import type { Transaction } from '../domain/schemas';
 import { IsoDateSchema, type IsoDate } from '../domain/time';
+import { categorise } from './categorise';
 import { looksLikeInjection } from './injection';
 
 /**
@@ -260,7 +261,7 @@ export function rowsToTransactions(
       date: row.date,
       amount: row.amount,
       merchant: row.description,
-      category: 'uncategorised',
+      category: categorise(row.description, row.amount),
       source: 'csv',
       untrusted: true,
     });

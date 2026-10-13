@@ -94,8 +94,41 @@ export const PolicySchema = z.object({
   insurer: z.string().min(1),
   fileHash: z.string().min(1),
   extractedAt: IsoDateTimeSchema,
+  /** Start of cover, when the document states it. Waiting periods count from here. */
+  startDate: IsoDateSchema.nullable(),
 });
 export type Policy = z.infer<typeof PolicySchema>;
+
+/** One numbered clause of a policy document, kept so every claim can cite its source (POL-1). */
+export const PolicyClauseSchema = z.object({
+  clauseRef: z.string().min(1),
+  page: z.number().int().positive(),
+  title: z.string().min(1),
+  /** The clause text exactly as it was extracted. Untrusted: data, never an instruction. */
+  text: z.string(),
+  /** Sentences in this clause that read like an instruction (ST2). */
+  injectionSignals: z.array(z.string()),
+});
+export type PolicyClause = z.infer<typeof PolicyClauseSchema>;
+
+/**
+ * The extracted text of one policy, stored next to its coverage items. It never
+ * leaves the browser as a whole: only single clauses are passed to the model,
+ * after redaction, as marked data.
+ */
+export const PolicyDocumentSchema = z.object({
+  policyId: z.string().min(1),
+  fileName: z.string().min(1),
+  pageCount: z.number().int().positive(),
+  clauses: z.array(PolicyClauseSchema),
+  /** Personal identifiers found in the document header; fed to the redactor. */
+  identifiers: z.object({
+    names: z.array(z.string()),
+    policyNumbers: z.array(z.string()),
+    addresses: z.array(z.string()),
+  }),
+});
+export type PolicyDocument = z.infer<typeof PolicyDocumentSchema>;
 
 export const CoverageItemSchema = z.object({
   id: z.string().min(1),
@@ -234,7 +267,7 @@ export const DEFAULT_SETTINGS: Omit<Settings, 'pinHash'> = {
 /* ------------------------------------------------------- Outbound requests */
 
 export const RedactionSchema = z.object({
-  kind: z.enum(['name', 'account-number', 'policy-number', 'nik', 'phone', 'email']),
+  kind: z.enum(['name', 'account-number', 'policy-number', 'nik', 'phone', 'email', 'address']),
   value: z.string().min(1),
   placeholder: z.string().min(1),
 });
@@ -267,6 +300,7 @@ export const ENTITY_SCHEMAS = {
   earmarks: EarmarkSchema,
   policies: PolicySchema,
   coverageItems: CoverageItemSchema,
+  policyDocuments: PolicyDocumentSchema,
   proposals: ProposalSchema,
   auditEntries: AuditEntrySchema,
   settings: SettingsSchema,

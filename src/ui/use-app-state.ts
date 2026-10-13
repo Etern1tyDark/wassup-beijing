@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useServices } from './services-context';
+import { buildForecastInputs, computeRunway, projectForecast, spendingAlerts } from '../forecast';
 import { EMPTY_STATE, type AppState } from './app-state';
 
 /**
@@ -34,13 +35,23 @@ export function useAppState(): { state: AppState; reload: () => void; loading: b
           return;
         }
 
-        const [snapshot, pending, audit, staleness, outbound] = await Promise.all([
+        const [snapshot, ledger, pending, audit, staleness, outbound, policies] = await Promise.all([
           services.actions.snapshot(),
+          services.actions.ledgerInput(),
           services.actions.pending(),
           services.repos.audit.all(),
           services.actions.staleness(),
           services.repos.outboundRequests.all(),
+          services.policies.all(),
         ]);
+
+        // Names and policy numbers from stored policies are stripped from
+        // anything sent to the model, including after a page reload.
+        services.gate.setRedactorConfig(await services.policies.redactorConfig());
+
+        const inputs = buildForecastInputs(ledger, snapshot);
+        const forecast = projectForecast(inputs);
+        const runway = computeRunway(inputs);
 
         if (cancelled) return;
         setState({
@@ -49,6 +60,9 @@ export function useAppState(): { state: AppState; reload: () => void; loading: b
           snapshot,
           earmarks,
           accountTypes: Object.fromEntries(accounts.map((account) => [account.id, account.type])),
+          accountNames: Object.fromEntries(accounts.map((account) => [account.id, account.name])),
+          forecast: { forecast, runway, alerts: spendingAlerts({ snapshot, forecast, runway, earmarks }) },
+          policies,
           pending,
           audit,
           staleness,

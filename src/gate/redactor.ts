@@ -14,6 +14,11 @@ export interface RedactorConfig {
   names: readonly string[];
   accountNumbers: readonly string[];
   policyNumbers: readonly string[];
+  /**
+   * Postal addresses the app has seen (for example in a policy header). An
+   * address has no reliable pattern, so only known ones can be removed.
+   */
+  addresses?: readonly string[];
 }
 
 export const EMPTY_REDACTOR_CONFIG: RedactorConfig = { names: [], accountNumbers: [], policyNumbers: [] };
@@ -25,6 +30,7 @@ export const PLACEHOLDERS: Record<RedactionKind, string> = {
   nik: '[REDACTED:NIK]',
   phone: '[REDACTED:PHONE]',
   email: '[REDACTED:EMAIL]',
+  address: '[REDACTED:ADDRESS]',
 };
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
@@ -69,6 +75,14 @@ export function redactText(input: string, config: RedactorConfig): { text: strin
   };
 
   apply(EMAIL, 'email', () => PLACEHOLDERS.email);
+
+  // Known addresses go first: they contain digits that later rules would
+  // otherwise pick apart.
+  for (const address of config.addresses ?? []) {
+    const trimmed = address.trim();
+    if (trimmed.length < 6) continue;
+    apply(new RegExp(escapeRegExp(trimmed), 'gi'), 'address', () => PLACEHOLDERS.address);
+  }
 
   for (const accountNumber of config.accountNumbers) {
     if (accountNumber.length === 0) continue;

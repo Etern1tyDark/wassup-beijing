@@ -5,7 +5,7 @@
   "type": "module",
   "description": "Local-first personal-finance agent with permission tiers (FinTechathon 2026)",
   "engines": {
-    "node": ">=22.6.0"
+    "node": ">=22.13.0"
   },
   "scripts": {
     "dev": "vite",
@@ -21,12 +21,14 @@
     "e2e": "playwright test",
     "seed": "node --experimental-strip-types scripts/seed/cli.ts",
     "verify:audit": "node --experimental-strip-types src/audit/verify-cli.ts",
+    "evidence": "node scripts/evidence/run.mjs",
     "relay:dev": "node --experimental-strip-types relay/dev-server.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.4",
     "dexie": "^4.4.6",
     "hono": "^4.13.13",
+    "pdfjs-dist": "^6.4.299",
     "react": "^19.3.0",
     "react-dom": "^19.3.0",
     "zod": "^4.6.7"

@@ -64,6 +64,18 @@ export async function setEarmarkActive(db: AppDatabase, earmarkId: string, activ
   if (updated === 0) throw new Error(`earmark ${earmarkId} does not exist`);
 }
 
+export async function updateEarmark(
+  db: AppDatabase,
+  earmarkId: string,
+  patch: Partial<Pick<Earmark, 'label' | 'amount' | 'reviewDate'>>,
+): Promise<void> {
+  const existing = await db.earmarks.get(earmarkId);
+  if (!existing) throw new Error(`earmark ${earmarkId} does not exist`);
+  const [validated] = await validate(EarmarkSchema, [{ ...existing, ...patch }], 'earmarks');
+  if (validated === undefined) throw new Error('earmark validation produced no row');
+  await db.earmarks.put(validated);
+}
+
 export async function addTransaction(db: AppDatabase, transaction: Transaction): Promise<void> {
   const [validated] = await validate(TransactionSchema, [transaction], 'transactions');
   if (validated === undefined) throw new Error('transaction validation produced no row');

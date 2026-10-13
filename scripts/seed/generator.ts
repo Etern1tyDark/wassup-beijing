@@ -20,6 +20,16 @@ export const SEED_PERSONA = 'Rina';
 export const DEFAULT_SEED = 'rina-v1';
 export const HISTORY_MONTHS = 6;
 
+/**
+ * Tuned so the persona lives close to the edge, which is the point of the
+ * product: a few million rupiah of free cash, a runway of two to three months,
+ * and one overdue invoice whose absence opens a gap inside the 90-day forecast.
+ */
+const OPENING_BANK = 15_000_000;
+const INVOICE_MIN = 1_600_000;
+const INVOICE_MAX = 2_800_000;
+const GOPAY_TOP_UP = 1_000_000;
+
 const CLIENT_POOL = [
   'Client Alpha',
   'Client Bravo',
@@ -51,7 +61,7 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
   const random = createRandom(`${seed}|${asOf}`);
 
   const accounts: Account[] = [
-    { id: 'acc_bca', name: 'BCA-main', type: 'bank', currency: 'IDR', openingBalance: money(4_000_000) },
+    { id: 'acc_bca', name: 'BCA-main', type: 'bank', currency: 'IDR', openingBalance: money(OPENING_BANK) },
     { id: 'acc_gopay', name: 'GoPay', type: 'e-wallet', currency: 'IDR', openingBalance: money(250_000) },
     {
       id: 'acc_sandbox',
@@ -103,14 +113,25 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
     );
     pushTransaction('acc_bca', addDays(month, 24), -149_000, 'Subscriptions (design tools)', 'subscriptions');
 
+    // The e-wallet is topped up from the bank on the 1st and only ever spends
+    // less than that top-up, so its balance can never go below zero.
+    pushTransaction('acc_bca', month, -GOPAY_TOP_UP, 'GoPay top-up', 'transfer');
+    pushTransaction('acc_gopay', month, GOPAY_TOP_UP, 'Top-up from BCA-main', 'transfer');
+
     for (const day of [2, 9, 16, 23]) {
-      const account = random.bool(0.5) ? 'acc_gopay' : 'acc_bca';
       pushTransaction(
-        account,
+        'acc_bca',
         addDays(month, day),
         -random.int(250_000, 750_000),
         'Grocery store',
         'groceries',
+      );
+      pushTransaction(
+        'acc_gopay',
+        addDays(month, day + 3),
+        -random.int(100_000, 250_000),
+        'Transport and food delivery',
+        'transport',
       );
     }
 
@@ -120,7 +141,7 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
       const dueDate = addDays(issueDate, 14);
       const lateDays = random.int(0, 45);
       const paidDate = addDays(dueDate, lateDays);
-      const amount = money(random.int(2_500_000, 9_000_000));
+      const amount = money(random.int(INVOICE_MIN, INVOICE_MAX));
       const id = `inv_${String(invoiceNumber).padStart(3, '0')}`;
 
       if (isInWindow(paidDate, asOf)) {
@@ -154,7 +175,7 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
 
   // The golden-path late invoice: issued 45 days ago, due 31 days ago, still open.
   const lateClient = clients[clients.length - 1] ?? CLIENT_POOL[0];
-  const lateAmount = money(random.int(3_000_000, 6_000_000));
+  const lateAmount = money(random.int(3_000_000, 4_500_000));
   invoices.push({
     id: 'inv_late',
     client: lateClient,
@@ -196,7 +217,7 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
     {
       id: 'obl_tax',
       label: 'Annual tax instalment',
-      amount: money(1_200_000),
+      amount: money(2_700_000),
       dueDate: addDays(asOf, 48),
       recurrence: 'once',
     },
@@ -320,5 +341,34 @@ export const ADVERSARIAL_CSV = [
   .map((line, index) => (index === 2 ? `2026-09-02,${line}` : line))
   .join('\n')
   .concat('\n');
+
+/**
+ * The statement Rina imports in the golden path (step 1): three small purchases
+ * on the as-of date, in the fixed schema, with a running balance that continues
+ * from the seeded bank balance.
+ */
+export function demoStatementCsv(dataset: SeedDataset): string {
+  const bank = dataset.accounts.find((account) => account.type === 'bank');
+  if (!bank) throw new Error('the seed dataset has no bank account');
+
+  let balance: number = bank.openingBalance;
+  for (const transaction of dataset.transactions) {
+    if (transaction.accountId === bank.id) balance += transaction.amount;
+  }
+
+  const rows: Array<[string, number]> = [
+    ['Pharmacy, Kimia Farma', -185_000],
+    ['Coffee shop', -45_000],
+    ['Bookstore', -155_000],
+  ];
+
+  const lines = ['date,description,amount,balance,account'];
+  for (const [description, amount] of rows) {
+    balance += amount;
+    const field = description.includes(',') ? `"${description}"` : description;
+    lines.push(`${dataset.asOf},${field},${amount},${balance},${bank.name}`);
+  }
+  return `${lines.join('\n')}\n`;
+}
 
 export type { Random };

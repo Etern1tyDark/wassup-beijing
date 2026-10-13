@@ -1,7 +1,17 @@
 import { formatRupiah, minMoney, subMoney, sumMoney, toMoney, type Money } from '../domain/money';
-import type { Account, AuditEntry, Earmark, GuardrailResult, Settings } from '../domain/schemas';
+import type { Account, AuditEntry, Earmark, GuardrailResult, Settings, Transaction } from '../domain/schemas';
+import type { IsoDate } from '../domain/time';
 import type { LedgerSnapshot } from '../ledger/engine';
-import type { EarmarkCreateParams, EarmarkDeleteParams, TransferParams, UndoParams } from './params';
+import {
+  MAX_IMPORT_ROWS,
+  type EarmarkCreateParams,
+  type EarmarkDeleteParams,
+  type EarmarkUpdateParams,
+  type StatementImportParams,
+  type TransactionAddParams,
+  type TransferParams,
+  type UndoParams,
+} from './params';
 
 /**
  * ACT-5 / PRD Section 6: the guardrails that stand between a proposal and the
@@ -22,10 +32,20 @@ export const GUARDRAIL_RULES = {
   reviewDate: 'reviewDate is set',
   maxActiveEarmarks: `at most ${MAX_ACTIVE_EARMARKS} active earmarks`,
   earmarkActive: 'the earmark exists and is still active',
+  earmarkUnchanged: 'the earmark has not changed since this was proposed',
+  increaseWithinFreeCash: 'increase <= freeCash',
   transferOwnAccounts: 'both accounts are the user\u2019s own bank or sandbox-savings accounts',
   transferSourceBalance: 'amount <= source account balance',
   transferPerTransferCap: 'amount <= simulated per-transfer cap',
   transferDailyCap: 'today\u2019s simulated transfers + amount <= simulated daily cap',
+  importKnownAccounts: 'every row names an account in the ledger',
+  importNoDuplicates: 'no row is already in the ledger',
+  importNotInFuture: 'no row is dated after today',
+  importRowCount: `at most ${MAX_IMPORT_ROWS} rows`,
+  transactionAccount: 'the account is in the ledger',
+  transactionDate: 'the date is within the last year and not after today',
+  transactionCap: 'amount <= perActionCap',
+  transactionBalance: 'does not take the account below zero',
   undoReversible: 'the referenced action was executed and is reversible',
   undoNotAlreadyUndone: 'the referenced action has not been undone already',
 } as const;
@@ -118,6 +138,84 @@ export function checkEarmarkDeleteGuardrails(
   return [pass(GUARDRAIL_RULES.earmarkActive, `${context.earmark.label} is active`)];
 }
 
+export interface EarmarkUpdateGuardrailContext {
+  earmark: Earmark | undefined;
+  snapshot: LedgerSnapshot;
+  settings: Settings;
+}
+
+export function checkEarmarkUpdateGuardrails(
+  params: EarmarkUpdateParams,
+  context: EarmarkUpdateGuardrailContext,
+): GuardrailResult[] {
+  const { earmark, snapshot, settings } = context;
+  if (!earmark) return [fail(GUARDRAIL_RULES.earmarkActive, `earmark ${params.earmarkId} does not exist`)];
+  if (!earmark.active) {
+    return [fail(GUARDRAIL_RULES.earmarkActive, `earmark ${params.earmarkId} is already inactive`)];
+  }
+
+  const results: GuardrailResult[] = [pass(GUARDRAIL_RULES.earmarkActive, `${earmark.label} is active`)];
+
+  const previous = params.previous;
+  const unchanged =
+    previous !== undefined &&
+    previous.label === earmark.label &&
+    previous.amount === earmark.amount &&
+    previous.reviewDate === earmark.reviewDate;
+  results.push(
+    unchanged
+      ? pass(
+          GUARDRAIL_RULES.earmarkUnchanged,
+          `still ${formatRupiah(earmark.amount)} until ${earmark.reviewDate}`,
+        )
+      : fail(
+          GUARDRAIL_RULES.earmarkUnchanged,
+          'the earmark was changed after this card was made; propose the change again',
+        ),
+  );
+
+  const amount = params.amount ?? earmark.amount;
+  const increase = subMoney(amount, earmark.amount);
+
+  // Lowering an earmark frees money, so only an increase is checked against cash.
+  results.push(
+    increase <= snapshot.freeCash
+      ? pass(
+          GUARDRAIL_RULES.increaseWithinFreeCash,
+          increase > 0
+            ? `${formatRupiah(increase)} more, of ${formatRupiah(snapshot.freeCash)} free cash`
+            : 'the amount does not go up',
+        )
+      : fail(
+          GUARDRAIL_RULES.increaseWithinFreeCash,
+          `${formatRupiah(increase)} more exceeds free cash of ${formatRupiah(snapshot.freeCash)}`,
+        ),
+  );
+
+  results.push(
+    increase <= snapshot.safeToSpend
+      ? pass(
+          GUARDRAIL_RULES.obligationsCovered,
+          `${formatRupiah(subMoney(snapshot.safeToSpend, increase))} stays available after obligations due in 30 days`,
+        )
+      : fail(
+          GUARDRAIL_RULES.obligationsCovered,
+          `would leave ${formatRupiah(subMoney(snapshot.safeToSpend, increase))} for obligations due in 30 days (${formatRupiah(snapshot.obligationsDueIn30Days)})`,
+        ),
+  );
+
+  results.push(
+    amount <= settings.perActionCap
+      ? pass(GUARDRAIL_RULES.perActionCap, `per-action cap is ${formatRupiah(settings.perActionCap)}`)
+      : fail(
+          GUARDRAIL_RULES.perActionCap,
+          `${formatRupiah(amount)} exceeds the per-action cap of ${formatRupiah(settings.perActionCap)}`,
+        ),
+  );
+
+  return results;
+}
+
 export interface TransferGuardrailContext {
   accounts: readonly Account[];
   settings: Settings;
@@ -196,6 +294,139 @@ export function checkTransferGuardrails(
       : fail(
           GUARDRAIL_RULES.transferDailyCap,
           `${formatRupiah(totalToday)} would exceed the daily cap of ${formatRupiah(dailyCap)}`,
+        ),
+  );
+
+  return results;
+}
+
+/** Key used to recognise a row that is already in the ledger. */
+export function duplicateKey(row: {
+  accountId: string;
+  date: string;
+  amount: number;
+  merchant: string;
+}): string {
+  return `${row.accountId}|${row.date}|${row.amount}|${row.merchant}`;
+}
+
+export interface StatementImportGuardrailContext {
+  accounts: readonly Account[];
+  transactions: readonly Transaction[];
+  today: IsoDate;
+}
+
+export function checkStatementImportGuardrails(
+  params: StatementImportParams,
+  context: StatementImportGuardrailContext,
+): GuardrailResult[] {
+  const results: GuardrailResult[] = [];
+  const idByName = new Map(context.accounts.map((account) => [account.name, account.id]));
+
+  const unknown = [...new Set(params.rows.map((row) => row.account).filter((name) => !idByName.has(name)))];
+  results.push(
+    unknown.length === 0
+      ? pass(
+          GUARDRAIL_RULES.importKnownAccounts,
+          `${[...new Set(params.rows.map((row) => row.account))].join(', ')}`,
+        )
+      : fail(
+          GUARDRAIL_RULES.importKnownAccounts,
+          `unknown account name(s): ${unknown.join(', ')}. Nothing is created or guessed`,
+        ),
+  );
+
+  const existing = new Set(context.transactions.map((transaction) => duplicateKey(transaction)));
+  const duplicates = params.rows.filter((row) => {
+    const accountId = idByName.get(row.account);
+    return (
+      accountId !== undefined &&
+      existing.has(duplicateKey({ accountId, date: row.date, amount: row.amount, merchant: row.description }))
+    );
+  });
+  results.push(
+    duplicates.length === 0
+      ? pass(GUARDRAIL_RULES.importNoDuplicates, 'no row matches an existing transaction')
+      : fail(
+          GUARDRAIL_RULES.importNoDuplicates,
+          `${duplicates.length} row(s) are already in the ledger (first: line ${duplicates[0]!.line}); this file looks like it was imported before`,
+        ),
+  );
+
+  const future = params.rows.filter((row) => row.date > context.today);
+  results.push(
+    future.length === 0
+      ? pass(GUARDRAIL_RULES.importNotInFuture, `every row is dated on or before ${context.today}`)
+      : fail(
+          GUARDRAIL_RULES.importNotInFuture,
+          `${future.length} row(s) are dated after ${context.today} (first: line ${future[0]!.line})`,
+        ),
+  );
+
+  results.push(
+    params.rows.length <= MAX_IMPORT_ROWS
+      ? pass(GUARDRAIL_RULES.importRowCount, `${params.rows.length} rows`)
+      : fail(GUARDRAIL_RULES.importRowCount, `${params.rows.length} rows`),
+  );
+
+  return results;
+}
+
+export interface TransactionAddGuardrailContext {
+  accounts: readonly Account[];
+  settings: Settings;
+  accountBalances: Record<string, Money>;
+  today: IsoDate;
+  /** One year before today. */
+  earliest: IsoDate;
+}
+
+export function checkTransactionAddGuardrails(
+  params: TransactionAddParams,
+  context: TransactionAddGuardrailContext,
+): GuardrailResult[] {
+  const results: GuardrailResult[] = [];
+  const account = context.accounts.find((candidate) => candidate.id === params.accountId);
+
+  results.push(
+    account
+      ? pass(GUARDRAIL_RULES.transactionAccount, account.name)
+      : fail(GUARDRAIL_RULES.transactionAccount, `account ${params.accountId} is not in the ledger`),
+  );
+
+  results.push(
+    params.date <= context.today && params.date >= context.earliest
+      ? pass(GUARDRAIL_RULES.transactionDate, params.date)
+      : fail(
+          GUARDRAIL_RULES.transactionDate,
+          `${params.date} is outside ${context.earliest} to ${context.today}`,
+        ),
+  );
+
+  const size = toMoney(Math.abs(params.amount));
+  results.push(
+    size <= context.settings.perActionCap
+      ? pass(
+          GUARDRAIL_RULES.transactionCap,
+          `per-action cap is ${formatRupiah(context.settings.perActionCap)}`,
+        )
+      : fail(
+          GUARDRAIL_RULES.transactionCap,
+          `${formatRupiah(size)} exceeds the per-action cap of ${formatRupiah(context.settings.perActionCap)}`,
+        ),
+  );
+
+  const balance = context.accountBalances[params.accountId] ?? toMoney(0);
+  const after = toMoney(balance + params.amount);
+  results.push(
+    after >= 0
+      ? pass(
+          GUARDRAIL_RULES.transactionBalance,
+          `${account?.name ?? 'the account'} would hold ${formatRupiah(after)}`,
+        )
+      : fail(
+          GUARDRAIL_RULES.transactionBalance,
+          `${account?.name ?? 'the account'} holds ${formatRupiah(balance)}, so this would leave ${formatRupiah(after)}`,
         ),
   );
 

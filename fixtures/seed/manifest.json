@@ -2,10 +2,10 @@
   "seed": "rina-v1",
   "persona": "Rina",
   "asOf": "2026-10-13",
-  "hash": "sha256:3a2803359bb22d5f4873586d362633f68effa39c74b3cb28e52fa13673512428",
+  "hash": "sha256:275a89e49e15383634b8871328e8c8e8218076455a958dbea2a4b769fa9617bd",
   "counts": {
     "accounts": 3,
-    "transactions": 60,
+    "transactions": 94,
     "invoices": 25,
     "openInvoices": 6,
     "obligations": 5,

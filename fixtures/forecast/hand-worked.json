@@ -1,0 +1,65 @@
+{
+  "name": "hand-worked forecast",
+  "description": "FC-1 to FC-3. Every expected number below was worked out by hand: day-to-day spending is Rp 4,500,000 over 90 days, so exactly Rp 50,000 a day.",
+  "inputs": {
+    "asOf": "2026-10-13",
+    "startingBalance": 10000000,
+    "activeEarmarkTotal": 1000000,
+    "obligations": [
+      {
+        "id": "obl_rent",
+        "label": "Rent",
+        "amount": 3500000,
+        "dueDate": "2026-09-18",
+        "recurrence": "monthly"
+      },
+      {
+        "id": "obl_tax",
+        "label": "Tax instalment",
+        "amount": 1200000,
+        "dueDate": "2026-11-30",
+        "recurrence": "once"
+      }
+    ],
+    "openInvoices": [
+      { "id": "inv_a", "client": "Client Alpha", "amount": 4000000, "dueDate": "2026-10-27" },
+      { "id": "inv_overdue", "client": "Client Bravo", "amount": 2000000, "dueDate": "2026-09-12" }
+    ],
+    "variableSpend": { "windowDays": 90, "total": 4500000 }
+  },
+  "expected": {
+    "balances": [
+      { "day": 0, "date": "2026-10-13", "balance": 10000000, "freeCash": 9000000 },
+      { "day": 4, "date": "2026-10-17", "balance": 9800000, "freeCash": 8800000 },
+      { "day": 5, "date": "2026-10-18", "balance": 6250000, "freeCash": 5250000 },
+      { "day": 14, "date": "2026-10-27", "balance": 9800000, "freeCash": 8800000 },
+      { "day": 36, "date": "2026-11-18", "balance": 5200000, "freeCash": 4200000 },
+      { "day": 48, "date": "2026-11-30", "balance": 3400000, "freeCash": 2400000 },
+      { "day": 65, "date": "2026-12-17", "balance": 2550000, "freeCash": 1550000 },
+      { "day": 66, "date": "2026-12-18", "balance": -1000000, "freeCash": -2000000 },
+      { "day": 90, "date": "2027-01-11", "balance": -2200000, "freeCash": -3200000 }
+    ],
+    "excludedInvoiceIds": ["inv_overdue"],
+    "lowestFreeCash": { "date": "2027-01-11", "amount": -3200000 },
+    "firstShortfallDate": "2026-12-18",
+    "runway": { "runwayDays": 66, "runwayMonths": 2.2, "depletionDate": "2026-12-18", "capped": false },
+    "scenarios": [
+      {
+        "name": "inv_a paid 60 days late",
+        "scenario": { "invoiceLate": { "invoiceIds": ["inv_a"], "daysLate": 60 } },
+        "runwayDays": 41,
+        "runwayMonths": 1.4,
+        "depletionDate": "2026-11-23",
+        "runwayDeltaDays": -25
+      },
+      {
+        "name": "one-off expense of 6,000,000 today",
+        "scenario": { "extraExpense": { "amount": 6000000 } },
+        "runwayDays": 5,
+        "runwayMonths": 0.2,
+        "depletionDate": "2026-10-18",
+        "runwayDeltaDays": -61
+      }
+    ]
+  }
+}

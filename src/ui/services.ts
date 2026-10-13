@@ -7,10 +7,11 @@ import { createActionService, type ActionService } from '../actions/service';
 import { createSettingsService, type SettingsService } from '../actions/settings';
 import { createOutboundGate, type OutboundGate } from '../gate/gate';
 import { createAgentTools, type AgentTools } from '../agent/tools';
-import { createOrchestrator, type AgentOrchestrator } from '../agent/orchestrator';
+import { createOrchestrator, untrustedTurnAuditEntry, type AgentOrchestrator } from '../agent/orchestrator';
 import { createMockModelAdapter } from '../agent/mock-model';
-import { createForecastEngine } from '../forecast';
-import { createCoverageEngine, createPolicyExtractor } from '../policy';
+import { createRelayModelAdapter, createRelayTransport } from '../agent/relay-model';
+import { createPolicyStore, type PolicyStore } from '../policy';
+import type { PdfTextResult } from '../importers/pdf';
 import { createDemoClock, type DemoClock } from './demo-clock';
 
 /**
@@ -28,25 +29,49 @@ export interface AppServices {
   actions: ActionService;
   settings: SettingsService;
   gate: OutboundGate;
+  policies: PolicyStore;
+  /** Reads the text of a policy PDF. pdf.js is loaded on first use. */
+  readPdf: (bytes: Uint8Array) => Promise<PdfTextResult>;
   tools: AgentTools;
   orchestrator: AgentOrchestrator;
   clock: DemoClock;
+  /** Which model answers the chat; shown in the interface so it is never ambiguous. */
+  modelKind: 'mock' | 'relay';
 }
 
 export interface AppServicesOptions {
   /** Overridden by tests so each one gets a clean IndexedDB. */
   databaseName?: string;
+  /** Tests turn this off so one test's clock anchor cannot leak into the next. */
+  persistClock?: boolean;
+  /**
+   * 'mock' is the rule-based model that needs no key and sends nothing; 'relay'
+   * is a hosted model behind the relay. Defaults to the VITE_MODEL build
+   * setting, and to 'mock' when that is unset.
+   */
+  model?: 'mock' | 'relay';
+  /** Tests pass the Node build of pdf.js; the browser loads its own with a worker. */
+  readPdf?: (bytes: Uint8Array) => Promise<PdfTextResult>;
 }
 
 export function createAppServices(options: AppServicesOptions = {}): AppServices {
   const db = createAppDatabase(options.databaseName);
   const repos = createRepositories(db);
-  const clock = createDemoClock();
+  const clock = createDemoClock({ persist: options.persistClock ?? true });
   const audit = createAuditLog(db, () => clock.now());
   const approvals = createApprovalService();
   const actions = createActionService({ db, repos, audit, approvals, clock });
   const settings = createSettingsService(db);
-  const gate = createOutboundGate({ db, repos, clock });
+  const modelKind = options.model ?? (import.meta.env?.['VITE_MODEL'] === 'relay' ? 'relay' : 'mock');
+  // With the rule-based model the gate keeps its stub transport: requests are
+  // redacted and recorded for the privacy panel, and nothing leaves the browser.
+  const gate = createOutboundGate({
+    db,
+    repos,
+    clock,
+    ...(modelKind === 'relay' ? { transport: createRelayTransport() } : {}),
+  });
+  const policies = createPolicyStore({ db, repos, now: () => clock.now() });
 
   const tools = createAgentTools({
     // The agent gets a narrowed surface: it can propose and read, and the object
@@ -57,12 +82,35 @@ export function createAppServices(options: AppServicesOptions = {}): AppServices
       ledgerInput: () => actions.ledgerInput(),
       staleness: () => actions.staleness(),
     },
-    forecast: createForecastEngine(),
-    policy: createPolicyExtractor(),
-    coverage: createCoverageEngine(),
+    policies: { all: () => policies.all() },
+    auditEntries: () => repos.audit.all(),
   });
 
-  const orchestrator = createOrchestrator({ model: createMockModelAdapter({ gate }), tools });
+  const orchestrator = createOrchestrator({
+    model: modelKind === 'relay' ? createRelayModelAdapter({ gate }) : createMockModelAdapter({ gate }),
+    tools,
+    onUntrustedTurn: async (turn) => {
+      await audit.append(untrustedTurnAuditEntry(turn));
+    },
+  });
 
-  return { db, repos, audit, approvals, actions, settings, gate, tools, orchestrator, clock };
+  const readPdf =
+    options.readPdf ??
+    (async (bytes: Uint8Array) => (await import('../importers/pdf-browser')).readPdfFile(bytes));
+
+  return {
+    db,
+    repos,
+    audit,
+    approvals,
+    actions,
+    settings,
+    gate,
+    policies,
+    readPdf,
+    tools,
+    orchestrator,
+    clock,
+    modelKind,
+  };
 }

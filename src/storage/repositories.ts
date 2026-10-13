@@ -7,6 +7,7 @@ import type {
   Obligation,
   OutboundRequest,
   Policy,
+  PolicyDocument,
   Proposal,
   Settings,
   Transaction,
@@ -47,6 +48,10 @@ export interface Repositories {
   coverageItems: {
     all(): Promise<CoverageItem[]>;
     byPolicy(policyId: string): Promise<CoverageItem[]>;
+  };
+  policyDocuments: {
+    all(): Promise<PolicyDocument[]>;
+    byPolicy(policyId: string): Promise<PolicyDocument | undefined>;
   };
   proposals: {
     all(): Promise<Proposal[]>;
@@ -102,6 +107,10 @@ export function createRepositories(db: AppDatabase): Repositories {
     coverageItems: {
       all: () => db.coverageItems.toArray(),
       byPolicy: (policyId) => db.coverageItems.where('policyId').equals(policyId).toArray(),
+    },
+    policyDocuments: {
+      all: () => db.policyDocuments.toArray(),
+      byPolicy: (policyId) => db.policyDocuments.get(policyId),
     },
     proposals: {
       all: () => db.proposals.toArray(),

@@ -3,6 +3,7 @@ import { createRoot } from 'react-dom/client';
 import { App } from './App';
 import { AppProvider } from './app-context';
 import { AppStateProvider } from './app-state-provider';
+import { LanguageProvider } from './language-provider';
 
 const container = document.getElementById('root');
 if (!container) throw new Error('#root is missing from index.html');
@@ -11,7 +12,9 @@ createRoot(container).render(
   <StrictMode>
     <AppProvider>
       <AppStateProvider>
-        <App />
+        <LanguageProvider>
+          <App />
+        </LanguageProvider>
       </AppStateProvider>
     </AppProvider>
   </StrictMode>,

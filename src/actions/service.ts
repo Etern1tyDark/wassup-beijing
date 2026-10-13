@@ -1,5 +1,5 @@
 import { randomHex } from '../domain/ids';
-import { addMoney, subMoney, toMoney } from '../domain/money';
+import { addMoney, negateMoney, toMoney } from '../domain/money';
 import {
   ProposalSchema,
   type AuditActor,
@@ -11,7 +11,8 @@ import {
   type Provenance,
   type Settings,
 } from '../domain/schemas';
-import { toIsoDate } from '../domain/time';
+import { addDays, toIsoDate } from '../domain/time';
+import { buildForecastInputs, computeRunway } from '../forecast';
 import { buildSnapshot, type LedgerInput, type LedgerSnapshot } from '../ledger/engine';
 import type { AuditLog } from '../audit/log';
 import type { AppDatabase } from '../storage/db';
@@ -23,6 +24,9 @@ import {
   allPass,
   checkEarmarkCreateGuardrails,
   checkEarmarkDeleteGuardrails,
+  checkEarmarkUpdateGuardrails,
+  checkStatementImportGuardrails,
+  checkTransactionAddGuardrails,
   checkTransferGuardrails,
   checkUndoGuardrails,
   failedRules,
@@ -46,6 +50,13 @@ import { evaluateStaleness, type StalenessReport } from './staleness';
  */
 
 export const PROPOSAL_TTL_MINUTES = 15;
+
+/**
+ * Approval fatigue is a risk in its own right (PRD Section 10): a user facing a
+ * pile of cards stops reading them. No more than this many proposals may wait
+ * at once; the next one is refused until the user decides on the existing ones.
+ */
+export const MAX_PENDING_PROPOSALS = 5;
 
 export interface ProposeInput {
   action: string;
@@ -168,6 +179,13 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
         };
         return checkEarmarkCreateGuardrails(parsed.params, earmarkContext);
       }
+      case 'earmark.update': {
+        return checkEarmarkUpdateGuardrails(parsed.params, {
+          earmark: await repos.earmarks.byId(parsed.params.earmarkId),
+          snapshot: context.snapshot,
+          settings: context.settings,
+        });
+      }
       case 'earmark.delete': {
         const earmark = await repos.earmarks.byId(parsed.params.earmarkId);
         return checkEarmarkDeleteGuardrails(parsed.params, { earmark });
@@ -178,6 +196,22 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
           settings: context.settings,
           simulatedTransfersToday: await executor.simulatedTransfersToday(),
           accountBalances: context.snapshot.balancesByAccount,
+        });
+      }
+      case 'statement.import': {
+        return checkStatementImportGuardrails(parsed.params, {
+          accounts: await repos.accounts.all(),
+          transactions: await repos.transactions.all(),
+          today: context.snapshot.asOf,
+        });
+      }
+      case 'transaction.add': {
+        return checkTransactionAddGuardrails(parsed.params, {
+          accounts: await repos.accounts.all(),
+          settings: context.settings,
+          accountBalances: context.snapshot.balancesByAccount,
+          today: context.snapshot.asOf,
+          earliest: addDays(context.snapshot.asOf, -366),
         });
       }
       case 'undo': {
@@ -191,64 +225,104 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     }
   }
 
-  async function diffFor(
+  /** Net effect of every row of an import whose account is in the ledger. */
+  async function importNet(rows: ReadonlyArray<{ account: string; amount: number }>): Promise<number> {
+    const names = new Set((await repos.accounts.all()).map((account) => account.name));
+    let net = 0;
+    for (const row of rows) if (names.has(row.account)) net += row.amount;
+    return net;
+  }
+
+  /**
+   * What a proposal would do to the two things every figure derives from: the
+   * money set aside in earmarks and the total balance.
+   */
+  async function effectOf(
     parsed: ParsedActionParams,
-    current: LedgerSnapshot,
     activeEarmarks: readonly Earmark[],
-  ): Promise<ProposalDiff> {
+  ): Promise<{ earmarked: number; balance: number; earmarkCount: number }> {
     const count = activeEarmarks.length;
 
     switch (parsed.action) {
-      case 'earmark.create': {
-        const amount = parsed.params.amount;
-        return {
-          safeToSpend: { before: current.safeToSpend, after: subMoney(current.safeToSpend, amount) },
-          freeCash: { before: current.freeCash, after: subMoney(current.freeCash, amount) },
-          activeEarmarks: { before: count, after: count + 1 },
-        };
+      case 'earmark.create':
+        return { earmarked: parsed.params.amount, balance: 0, earmarkCount: count + 1 };
+      case 'earmark.update': {
+        const earmark = activeEarmarks.find((candidate) => candidate.id === parsed.params.earmarkId);
+        const change = earmark ? (parsed.params.amount ?? earmark.amount) - earmark.amount : 0;
+        return { earmarked: change, balance: 0, earmarkCount: count };
       }
       case 'earmark.delete': {
         const earmark = activeEarmarks.find((candidate) => candidate.id === parsed.params.earmarkId);
-        const amount = earmark?.amount ?? toMoney(0);
         return {
-          safeToSpend: { before: current.safeToSpend, after: addMoney(current.safeToSpend, amount) },
-          freeCash: { before: current.freeCash, after: addMoney(current.freeCash, amount) },
-          activeEarmarks: { before: count, after: Math.max(0, count - 1) },
+          earmarked: negateMoney(earmark?.amount ?? toMoney(0)),
+          balance: 0,
+          earmarkCount: Math.max(0, count - 1),
         };
       }
-      case 'transfer': {
+      case 'transfer':
         // A simulated transfer moves money between the user's own accounts, so
         // the totals do not change.
-        return {
-          safeToSpend: { before: current.safeToSpend, after: current.safeToSpend },
-          freeCash: { before: current.freeCash, after: current.freeCash },
-          activeEarmarks: { before: count, after: count },
-        };
-      }
+        return { earmarked: 0, balance: 0, earmarkCount: count };
+      case 'statement.import':
+        return { earmarked: 0, balance: await importNet(parsed.params.rows), earmarkCount: count };
+      case 'transaction.add':
+        return { earmarked: 0, balance: parsed.params.amount, earmarkCount: count };
       case 'undo': {
         const entry = await repos.audit.byId(parsed.params.auditEntryId);
         const original = entry?.proposalId ? await repos.proposals.byId(entry.proposalId) : undefined;
         const amount = typeof original?.params?.['amount'] === 'number' ? original.params['amount'] : 0;
 
-        // Reversing a transfer between the user's own accounts moves no totals
-        // and no earmarks, so the card must show no change.
-        if (entry?.action === 'transfer') {
-          return {
-            safeToSpend: { before: current.safeToSpend, after: current.safeToSpend },
-            freeCash: { before: current.freeCash, after: current.freeCash },
-            activeEarmarks: { before: count, after: count },
-          };
+        switch (entry?.action) {
+          case 'transfer':
+            // Reversing a transfer between the user's own accounts moves no
+            // totals and no earmarks, so the card must show no change.
+            return { earmarked: 0, balance: 0, earmarkCount: count };
+          case 'earmark.delete':
+            return { earmarked: amount, balance: 0, earmarkCount: count + 1 };
+          case 'earmark.update': {
+            const before = (original?.params?.['previous'] as { amount?: unknown } | undefined)?.amount;
+            const restored = typeof before === 'number' ? before - (amount || before) : 0;
+            return { earmarked: restored, balance: 0, earmarkCount: count };
+          }
+          case 'transaction.add':
+            return { earmarked: 0, balance: -amount, earmarkCount: count };
+          case 'statement.import': {
+            const rows = original?.params?.['rows'];
+            const net = Array.isArray(rows)
+              ? await importNet(rows as Array<{ account: string; amount: number }>)
+              : 0;
+            return { earmarked: 0, balance: -net, earmarkCount: count };
+          }
+          default:
+            return { earmarked: -amount, balance: 0, earmarkCount: Math.max(0, count - 1) };
         }
-
-        const releases = entry?.action === 'earmark.delete';
-        const restored = toMoney(releases ? -amount : amount);
-        return {
-          safeToSpend: { before: current.safeToSpend, after: addMoney(current.safeToSpend, restored) },
-          freeCash: { before: current.freeCash, after: addMoney(current.freeCash, restored) },
-          activeEarmarks: { before: count, after: releases ? count + 1 : Math.max(0, count - 1) },
-        };
       }
     }
+  }
+
+  /** The before/after figures on the approval card (PRD Section 6, ACT-6). */
+  async function diffFor(
+    parsed: ParsedActionParams,
+    current: LedgerSnapshot,
+    ledger: LedgerInput,
+  ): Promise<ProposalDiff> {
+    const activeEarmarks = ledger.earmarks.filter((earmark) => earmark.active);
+    const effect = await effectOf(parsed, activeEarmarks);
+    const change = toMoney(effect.balance - effect.earmarked);
+
+    const inputs = buildForecastInputs(ledger, current);
+    const runwayAfter = computeRunway({
+      ...inputs,
+      startingBalance: addMoney(inputs.startingBalance, toMoney(effect.balance)),
+      activeEarmarkTotal: addMoney(inputs.activeEarmarkTotal, toMoney(effect.earmarked)),
+    });
+
+    return {
+      safeToSpend: { before: current.safeToSpend, after: addMoney(current.safeToSpend, change) },
+      freeCash: { before: current.freeCash, after: addMoney(current.freeCash, change) },
+      runwayMonths: { before: computeRunway(inputs).runwayMonths, after: runwayAfter.runwayMonths },
+      activeEarmarks: { before: activeEarmarks.length, after: effect.earmarkCount },
+    };
   }
 
   async function propose(input: ProposeInput): Promise<ProposeResult> {
@@ -269,6 +343,19 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       return refuse(input, `refused: ${parsed.reason}`);
     }
 
+    // The "before" of an earmark change comes from the ledger, never from the caller.
+    if (parsed.value.action === 'earmark.update') {
+      const earmark = await repos.earmarks.byId(parsed.value.params.earmarkId);
+      const { previous: _ignored, ...requested } = parsed.value.params;
+      void _ignored;
+      parsed.value.params = earmark
+        ? {
+            ...requested,
+            previous: { label: earmark.label, amount: earmark.amount, reviewDate: earmark.reviewDate },
+          }
+        : requested;
+    }
+
     const provenance = checkProvenance(input.provenance, definition.tier);
     if (!provenance.ok) {
       return refuse(input, provenance.reason ?? 'refused: untrusted input');
@@ -284,12 +371,12 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       );
     }
 
-    const currentSnapshot = await snapshot();
-    const earmarks = await repos.earmarks.all();
+    const ledger = await ledgerInput();
+    const currentSnapshot = buildSnapshot(ledger, toIsoDate(clock.now()));
     const guardrails = await guardrailsFor(parsed.value, {
       snapshot: currentSnapshot,
       settings: currentSettings,
-      activeEarmarks: earmarks.filter((earmark) => earmark.active),
+      activeEarmarks: ledger.earmarks.filter((earmark) => earmark.active),
     });
 
     if (!allPass(guardrails)) {
@@ -298,6 +385,14 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
         .map((result) => `${result.rule}: ${result.detail}`)
         .join('; ');
       return refuse(input, `refused by guardrails: ${reasons}`, guardrails);
+    }
+
+    const waiting = await pending();
+    if (waiting.length >= MAX_PENDING_PROPOSALS) {
+      return refuse(
+        input,
+        `refused: ${waiting.length} proposals are already waiting for approval. Approve or reject those cards first`,
+      );
     }
 
     if (input.idempotencyKey) {
@@ -317,11 +412,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       tier: definition.tier,
       params: parsed.value.params as Record<string, unknown>,
       provenance: input.provenance,
-      diff: await diffFor(
-        parsed.value,
-        currentSnapshot,
-        earmarks.filter((earmark) => earmark.active),
-      ),
+      diff: await diffFor(parsed.value, currentSnapshot, ledger),
       guardrails,
       expiresAt: new Date(now.getTime() + PROPOSAL_TTL_MINUTES * 60_000).toISOString(),
       idempotencyKey: input.idempotencyKey ?? randomHex(16),
@@ -347,8 +438,27 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     return { kind: 'proposal', proposal };
   }
 
+  async function expire(proposal: Proposal): Promise<void> {
+    await db.proposals.put({ ...proposal, status: 'expired' });
+    await audit.append({
+      actor: 'system',
+      event: 'refused',
+      action: proposal.action,
+      proposalId: proposal.proposalId,
+      detail: 'proposal expired before approval',
+      payload: { expiresAt: proposal.expiresAt },
+    });
+  }
+
+  /** Proposals still waiting. One whose time has run out is expired and logged on the way. */
   async function pending(): Promise<Proposal[]> {
-    return repos.proposals.byStatus('pending');
+    const now = clock.now().getTime();
+    const live: Proposal[] = [];
+    for (const proposal of await repos.proposals.byStatus('pending')) {
+      if (new Date(proposal.expiresAt).getTime() < now) await expire(proposal);
+      else live.push(proposal);
+    }
+    return live;
   }
 
   async function issueApprovalToken(proposalId: string): Promise<ApprovalToken> {
@@ -366,15 +476,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
 
     const now = clock.now();
     if (new Date(proposal.expiresAt).getTime() < now.getTime()) {
-      await db.proposals.put({ ...proposal, status: 'expired' });
-      await audit.append({
-        actor: 'system',
-        event: 'refused',
-        action: proposal.action,
-        proposalId: proposal.proposalId,
-        detail: 'proposal expired before approval',
-        payload: { expiresAt: proposal.expiresAt },
-      });
+      await expire(proposal);
       return { kind: 'rejected', reason: 'the proposal has expired' };
     }
 

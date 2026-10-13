@@ -8,6 +8,7 @@ import type {
   Obligation,
   OutboundRequest,
   Policy,
+  PolicyDocument,
   Proposal,
   Settings,
   Transaction,
@@ -33,6 +34,7 @@ export class AppDatabase extends Dexie {
   declare earmarks: Table<Earmark, string>;
   declare policies: Table<Policy, string>;
   declare coverageItems: Table<CoverageItem, string>;
+  declare policyDocuments: Table<PolicyDocument, string>;
   declare proposals: Table<Proposal, string>;
   declare auditEntries: Table<AuditEntry, number>;
   declare settings: Table<Settings, string>;
@@ -53,6 +55,8 @@ export class AppDatabase extends Dexie {
       settings: 'id',
       outboundRequests: 'id, time, status',
     });
+    // v2: the extracted clause text of each policy (POL-1, POL-5).
+    this.version(2).stores({ policyDocuments: 'policyId' });
   }
 }
 

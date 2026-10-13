@@ -36,6 +36,12 @@ export const ACTION_REGISTRY = {
     prdRef: 'FC-3',
     reversible: false,
   },
+  get_spending: {
+    tier: 'T0',
+    description: 'Money in and out for a period, by category',
+    prdRef: 'CHAT-3',
+    reversible: false,
+  },
   list_policies: {
     tier: 'T0',
     description: 'Policy ids and display names',
@@ -66,10 +72,28 @@ export const ACTION_REGISTRY = {
     prdRef: 'ACT-5',
     reversible: true,
   },
+  'earmark.update': {
+    tier: 'T2',
+    description: 'Change the label, amount or review date of an active earmark',
+    prdRef: 'ACT-5',
+    reversible: true,
+  },
   'earmark.delete': {
     tier: 'T2',
     description: 'Release a previously created earmark',
     prdRef: 'ACT-5',
+    reversible: true,
+  },
+  'statement.import': {
+    tier: 'T2',
+    description: 'Add the rows of a statement CSV to the ledger',
+    prdRef: 'ING-1',
+    reversible: true,
+  },
+  'transaction.add': {
+    tier: 'T2',
+    description: 'Add one transaction typed in chat, after a confirmation card',
+    prdRef: 'ING-4',
     reversible: true,
   },
   undo: {

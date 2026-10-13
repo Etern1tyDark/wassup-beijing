@@ -1,6 +1,15 @@
 import type { AuditEntry, Earmark, OutboundRequest, Proposal, Settings } from '../domain/schemas';
 import type { LedgerSnapshot } from '../ledger/engine';
 import type { StalenessReport } from '../actions/staleness';
+import type { ForecastResult, RunwayResult, SpendingAlert } from '../forecast';
+import type { LoadedPolicy } from '../policy';
+
+/** Everything the runway widget shows, computed by the forecast engine (FC-1 to FC-4, ACT-6). */
+export interface ForecastView {
+  forecast: ForecastResult;
+  runway: RunwayResult;
+  alerts: SpendingAlert[];
+}
 
 export interface AppState {
   /** True once the first read from IndexedDB has completed. */
@@ -10,6 +19,9 @@ export interface AppState {
   snapshot: LedgerSnapshot | null;
   earmarks: Earmark[];
   accountTypes: Record<string, string>;
+  accountNames: Record<string, string>;
+  forecast: ForecastView | null;
+  policies: LoadedPolicy[];
   pending: Proposal[];
   audit: AuditEntry[];
   staleness: StalenessReport | null;
@@ -23,6 +35,9 @@ export const EMPTY_STATE: AppState = {
   snapshot: null,
   earmarks: [],
   accountTypes: {},
+  accountNames: {},
+  forecast: null,
+  policies: [],
   pending: [],
   audit: [],
   staleness: null,

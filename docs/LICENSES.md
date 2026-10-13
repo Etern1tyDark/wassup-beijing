@@ -17,6 +17,7 @@ npm ls --all --json > /dev/null   # or inspect node_modules/*/package.json
 | `@hono/node-server` | 2.1.4   | MIT        | Local dev server for the relay function    |
 | `dexie`             | 4.4.6   | Apache-2.0 | IndexedDB wrapper for browser-only storage |
 | `hono`              | 4.13.13 | MIT        | The one serverless relay function          |
+| `pdfjs-dist`        | 6.4.299 | Apache-2.0 | Reads the text layer of policy PDFs        |
 | `react`             | 19.3.0  | MIT        | UI                                         |
 | `react-dom`         | 19.3.0  | MIT        | UI                                         |
 | `zod`               | 4.6.7   | MIT        | Schemas and validation for every entity    |
@@ -49,30 +50,39 @@ npm ls --all --json > /dev/null   # or inspect node_modules/*/package.json
 
 ## Transitive dependency licences
 
-241 packages are installed in total (direct plus transitive). Licence counts:
+258 packages are installed in total (direct plus transitive) on macOS arm64; the count
+differs slightly by platform because native binaries are per-platform. Licence counts:
 
-| Licence      | Packages |
-| ------------ | -------- |
-| MIT          | 190      |
-| Apache-2.0   | 22       |
-| ISC          | 11       |
-| BSD-2-Clause | 8        |
-| BSD-3-Clause | 3        |
-| MIT-0        | 2        |
-| MPL-2.0      | 2        |
-| CC0-1.0      | 1        |
-| CC-BY-4.0    | 1        |
-| Python-2.0   | 1        |
+| Licence       | Packages |
+| ------------- | -------- |
+| MIT           | 199      |
+| Apache-2.0    | 25       |
+| ISC           | 12       |
+| BSD-2-Clause  | 8        |
+| BlueOak-1.0.0 | 4        |
+| BSD-3-Clause  | 3        |
+| MIT-0         | 2        |
+| MPL-2.0       | 2        |
+| CC0-1.0       | 1        |
+| CC-BY-4.0     | 1        |
+| Python-2.0    | 1        |
 
-Notes on the non-permissive entries:
+Notes on the entries that are not MIT, Apache, ISC or BSD:
 
-- `lightningcss` and `lightningcss-win32-x64-msvc` (MPL-2.0) are pulled in by Vite as a
+- `lightningcss` and its per-platform binary (MPL-2.0) are pulled in by Vite as a
   **build-time** CSS transformer. They are used unmodified, are not copied into this
   repository, and are not distributed as part of the built site. MPL-2.0 is file-level
   copyleft, so an unmodified dependency does not affect our licence.
+- `lru-cache` and `minimatch` (BlueOak-1.0.0, a permissive licence) are transitive
+  dependencies of jsdom and typescript-eslint: test and lint tooling only.
 - `caniuse-lite` (CC-BY-4.0) and `argparse` (Python-2.0) are transitive build-time data
   and utility packages, also unmodified and not redistributed.
+- `@napi-rs/canvas` (MIT) is an optional dependency of `pdfjs-dist` for rendering pages in
+  Node. This project only reads text, never renders, and it is not part of the built site.
 - There is **no GPL or AGPL code anywhere in the dependency tree.**
+
+`pdfjs-dist` is the only third-party code that ships in the built site besides React,
+Dexie and Zod. It is loaded from this origin, on demand, when a policy PDF is opened.
 
 ## Platform components (no dependency, no licence to record)
 
@@ -85,5 +95,7 @@ Notes on the non-permissive entries:
 ## Our own code
 
 All source in `src/`, `scripts/`, `relay/`, `tools/`, `tests/` and `fixtures/` is written by
-the team for this submission. It is unlicensed in this repository (all rights reserved by the
+the team for this submission. That includes the synthetic policy documents in
+`fixtures/policies/` and `public/samples/`: the insurers, the insured person and every
+figure in them are invented, and no wording is copied from a real policy. It is unlicensed in this repository (all rights reserved by the
 team) and contains no copied third-party code.

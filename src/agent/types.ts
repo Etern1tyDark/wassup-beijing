@@ -17,13 +17,17 @@ export interface ToolDescriptor {
 }
 
 export type ToolResult =
-  { ok: true; tool: ActionName; data: unknown } | { ok: false; tool: ActionName; reason: string };
+  | { ok: true; tool: ActionName; data: unknown }
+  /** `tool` is the name the model asked for, which may not be a registered action. */
+  | { ok: false; tool: string; reason: string };
 
 export interface ToolContext {
   /** Who asked, for provenance. */
   requestedBy: string;
   /** Untrusted sources that fed this call, if any. */
   untrustedInputs?: Array<{ source: 'csv' | 'document' | 'chat'; ref: string; fields: string[] }>;
+  /** Text pasted from somewhere else (a notice, a document). Always treated as data. */
+  pastedText?: string;
 }
 
 export interface AgentTool {
@@ -38,6 +42,10 @@ export interface ModelMessage {
   content: string;
   /** Set on tool results. */
   name?: string;
+  /** Set on assistant messages that asked for tools. */
+  toolCalls?: ModelToolCall[];
+  /** Set on assistant messages that asked the user to choose (CHAT-2). */
+  options?: string[];
 }
 
 export interface ModelRequest {
@@ -53,6 +61,10 @@ export interface ModelToolCall {
 export interface ModelResponse {
   content: string;
   toolCalls: ModelToolCall[];
+  /** Choices to offer as buttons when the model asks a clarifying question (CHAT-2). */
+  options?: string[];
+  /** True when the model could not be reached and `content` is the adapter's own notice. */
+  unavailable?: boolean;
 }
 
 /**
@@ -62,14 +74,4 @@ export interface ModelResponse {
 export interface ModelAdapter {
   readonly id: string;
   complete(request: ModelRequest): Promise<ModelResponse>;
-}
-
-export class NotImplementedError extends Error {
-  override readonly name = 'NotImplementedError';
-  readonly requirement: string;
-
-  constructor(message: string, requirement: string) {
-    super(`${message} (not implemented yet - see ${requirement})`);
-    this.requirement = requirement;
-  }
 }

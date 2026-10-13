@@ -1,16 +1,28 @@
 import { randomId } from '../domain/ids';
-import { negateMoney, absMoney, sumMoney, type Money } from '../domain/money';
+import { negateMoney, absMoney, formatRupiah, sumMoney, type Money } from '../domain/money';
 import type { Earmark, Proposal, Settings, Transaction } from '../domain/schemas';
 import { toIsoDate } from '../domain/time';
 import type { AuditLog } from '../audit/log';
 import type { Repositories } from '../storage/repositories';
 import type { AppDatabase } from '../storage/db';
-import { addEarmark, addTransaction, removeTransactions, setEarmarkActive } from '../storage/ledger-writes';
+import {
+  addEarmark,
+  addTransaction,
+  putTransactions,
+  removeTransactions,
+  setEarmarkActive,
+  updateEarmark,
+} from '../storage/ledger-writes';
+import { categorise } from '../importers/categorise';
+import { looksLikeInjection } from '../importers/injection';
 import type { Clock } from './clock';
 import type {
   EarmarkCreateParams,
   EarmarkDeleteParams,
+  EarmarkUpdateParams,
   ParsedActionParams,
+  StatementImportParams,
+  TransactionAddParams,
   TransferParams,
   UndoParams,
 } from './params';
@@ -90,16 +102,26 @@ export function createExecutor(deps: ExecutorDeps): Executor {
   }
 
   async function execute(proposal: Proposal, settings: Settings): Promise<ExecutionOutcome> {
-    const stale = await blockStale(proposal, settings);
-    if (stale) return stale;
+    // Importing a statement is how stale data gets refreshed, so it is the one
+    // action the staleness guard must not block (ST8).
+    if (proposal.action !== 'statement.import') {
+      const stale = await blockStale(proposal, settings);
+      if (stale) return stale;
+    }
 
     const params = proposal.params as ParsedActionParams['params'];
 
     switch (proposal.action) {
       case 'earmark.create':
         return applyEarmarkCreate(proposal, params as EarmarkCreateParams);
+      case 'earmark.update':
+        return applyEarmarkUpdate(proposal, params as EarmarkUpdateParams);
       case 'earmark.delete':
         return applyEarmarkDelete(proposal, params as EarmarkDeleteParams);
+      case 'statement.import':
+        return applyStatementImport(proposal, params as StatementImportParams);
+      case 'transaction.add':
+        return applyTransactionAdd(proposal, params as TransactionAddParams);
       case 'undo':
         return applyUndo(proposal, params as UndoParams);
       case 'transfer':
@@ -152,6 +174,47 @@ export function createExecutor(deps: ExecutorDeps): Executor {
     }
   }
 
+  async function applyEarmarkUpdate(
+    proposal: Proposal,
+    params: EarmarkUpdateParams,
+  ): Promise<ExecutionOutcome> {
+    const previous = params.previous;
+    if (!previous) {
+      return {
+        ok: false,
+        reason: 'the proposal does not record the earmark it was made against',
+        detail: 'refused',
+        auditEntryId: null,
+      };
+    }
+    const next = {
+      label: params.label ?? previous.label,
+      amount: params.amount ?? previous.amount,
+      reviewDate: params.reviewDate ?? previous.reviewDate,
+    };
+
+    await updateEarmark(db, params.earmarkId, next);
+    try {
+      const entry = await audit.append({
+        actor: 'system',
+        event: 'executed',
+        action: 'earmark.update',
+        proposalId: proposal.proposalId,
+        detail: `changed earmark "${previous.label}" from ${previous.amount} until ${previous.reviewDate} to "${next.label}" ${next.amount} until ${next.reviewDate}`,
+        payload: { earmarkId: params.earmarkId, previous, next },
+      });
+      return {
+        ok: true,
+        reason: null,
+        detail: `earmark ${params.earmarkId} changed`,
+        auditEntryId: entry.id,
+      };
+    } catch (error) {
+      await updateEarmark(db, params.earmarkId, previous);
+      throw error;
+    }
+  }
+
   async function applyEarmarkDelete(
     proposal: Proposal,
     params: EarmarkDeleteParams,
@@ -174,6 +237,115 @@ export function createExecutor(deps: ExecutorDeps): Executor {
       };
     } catch (error) {
       await setEarmarkActive(db, params.earmarkId, true);
+      throw error;
+    }
+  }
+
+  /**
+   * Rows written by one execution share the prefix `txn_<audit entry id>_`, so
+   * an undo can find exactly the rows that execution created.
+   */
+  function transactionIdPrefix(auditEntryId: string): string {
+    return `txn_${auditEntryId}_`;
+  }
+
+  async function applyStatementImport(
+    proposal: Proposal,
+    params: StatementImportParams,
+  ): Promise<ExecutionOutcome> {
+    const accounts = await repos.accounts.all();
+    const idByName = new Map(accounts.map((account) => [account.name, account.id]));
+    const auditId = randomId('aud');
+
+    const transactions: Transaction[] = [];
+    for (const [index, row] of params.rows.entries()) {
+      const accountId = idByName.get(row.account);
+      if (accountId === undefined) {
+        return {
+          ok: false,
+          reason: `line ${row.line} names the account "${row.account}", which is not in the ledger`,
+          detail: 'refused',
+          auditEntryId: null,
+        };
+      }
+      transactions.push({
+        id: `${transactionIdPrefix(auditId)}${String(index + 1).padStart(4, '0')}`,
+        accountId,
+        date: row.date,
+        amount: row.amount,
+        // Statement text is untrusted: it is stored as data and marked as such.
+        merchant: row.description,
+        category: categorise(row.description, row.amount),
+        source: 'csv',
+        untrusted: true,
+      });
+    }
+
+    const net = sumMoney(transactions.map((transaction) => transaction.amount));
+    const flagged = params.rows.filter((row) => looksLikeInjection(row.description)).length;
+
+    await putTransactions(db, transactions);
+    try {
+      const entry = await audit.append({
+        id: auditId,
+        actor: 'system',
+        event: 'executed',
+        action: 'statement.import',
+        proposalId: proposal.proposalId,
+        detail:
+          `imported ${transactions.length} row(s) from ${params.fileName}, net ${formatRupiah(net)}` +
+          (flagged > 0
+            ? `; ${flagged} description(s) read like an instruction and were stored as data only`
+            : ''),
+        payload: { fileHash: params.fileHash, rowCount: transactions.length, net, flagged },
+      });
+      return {
+        ok: true,
+        reason: null,
+        detail: `imported ${transactions.length} row(s) from ${params.fileName}`,
+        auditEntryId: entry.id,
+      };
+    } catch (error) {
+      await compensateTransactions(transactions.map((transaction) => transaction.id));
+      throw error;
+    }
+  }
+
+  async function applyTransactionAdd(
+    proposal: Proposal,
+    params: TransactionAddParams,
+  ): Promise<ExecutionOutcome> {
+    const auditId = randomId('aud');
+    const transaction: Transaction = {
+      id: `${transactionIdPrefix(auditId)}chat`,
+      accountId: params.accountId,
+      date: params.date,
+      amount: params.amount,
+      merchant: params.merchant,
+      category: params.category,
+      source: 'chat',
+      untrusted: false,
+    };
+
+    await addTransaction(db, transaction);
+    try {
+      const entry = await audit.append({
+        id: auditId,
+        actor: 'system',
+        event: 'executed',
+        action: 'transaction.add',
+        proposalId: proposal.proposalId,
+        detail: `added "${transaction.merchant}" ${formatRupiah(transaction.amount)} on ${transaction.date}`,
+        payload: { transactionId: transaction.id, amount: transaction.amount, date: transaction.date },
+      });
+      return {
+        ok: true,
+        reason: null,
+        detail: `transaction ${transaction.id} added`,
+        auditEntryId: entry.id,
+      };
+    } catch (error) {
+      await compensateTransactions([transaction.id]);
       throw error;
     }
   }
@@ -305,6 +477,47 @@ export function createExecutor(deps: ExecutorDeps): Executor {
         ok: true,
         detail: `earmark ${earmarkId} restored`,
         compensate: async () => setEarmarkActive(db, earmarkId, false),
+      };
+    }
+
+    if (action === 'earmark.update') {
+      if (!originalProposalId) return { ok: false, reason: 'the original proposal is unknown' };
+      const original = await repos.proposals.byId(originalProposalId);
+      const updated = original?.params as Partial<EarmarkUpdateParams> | undefined;
+      const earmarkId = updated?.earmarkId;
+      const previous = updated?.previous;
+      if (typeof earmarkId !== 'string' || !previous) {
+        return { ok: false, reason: 'cannot undo the change: the original proposal is incomplete' };
+      }
+      const current = await repos.earmarks.byId(earmarkId);
+      if (!current || !current.active) {
+        return { ok: false, reason: 'the earmark was released after it was changed' };
+      }
+      const changed = { label: current.label, amount: current.amount, reviewDate: current.reviewDate };
+      await updateEarmark(db, earmarkId, previous);
+      return {
+        ok: true,
+        detail: `earmark ${earmarkId} restored to ${previous.amount} until ${previous.reviewDate}`,
+        compensate: async () => updateEarmark(db, earmarkId, changed),
+      };
+    }
+
+    if (action === 'statement.import' || action === 'transaction.add') {
+      const prefix = transactionIdPrefix(originalAuditEntryId);
+      const created = (await repos.transactions.all()).filter((transaction) =>
+        transaction.id.startsWith(prefix),
+      );
+      if (created.length === 0) {
+        return { ok: false, reason: 'the transactions added by that action no longer exist' };
+      }
+      await removeTransactions(
+        db,
+        created.map((transaction) => transaction.id),
+      );
+      return {
+        ok: true,
+        detail: `${created.length} transaction(s) removed`,
+        compensate: async () => putTransactions(db, created),
       };
     }
 
