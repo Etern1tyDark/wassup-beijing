@@ -2,7 +2,6 @@ import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { AccountSchema, EarmarkSchema, InvoiceSchema, ObligationSchema, TransactionSchema } from '../domain/schemas';
-import type { IsoDate } from '../domain/time';
 import { createTestWorld, type TestWorld } from '../testing/harness';
 import { GUARDRAIL_RULES } from './guardrails';
 import type { ProposeResult } from './service';
@@ -133,7 +132,7 @@ describe('seeded ledger drives the golden path', () => {
     ) as { asOf: string; accounts: unknown[]; transactions: unknown[]; invoices: unknown[]; obligations: unknown[] };
 
     const world = await createTestWorld({
-      asOf: dataset.asOf as IsoDate,
+      asOf: dataset.asOf,
       accounts: dataset.accounts.map((row) => AccountSchema.parse(row)),
       transactions: dataset.transactions.map((row) => TransactionSchema.parse(row)),
       invoices: dataset.invoices.map((row) => InvoiceSchema.parse(row)),

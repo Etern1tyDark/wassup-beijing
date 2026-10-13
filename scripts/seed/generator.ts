@@ -34,7 +34,7 @@ export interface GenerateSeedOptions {
 }
 
 function startOfMonth(value: IsoDate): IsoDate {
-  return `${value.slice(0, 7)}-01` as IsoDate;
+  return `${value.slice(0, 7)}-01`;
 }
 
 function isInWindow(date: IsoDate, asOf: IsoDate): boolean {
