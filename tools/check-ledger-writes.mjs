@@ -4,10 +4,10 @@
  *
  * Rule 1 - the ledger write API (src/storage/ledger-writes.ts) may only be
  *          imported by the action executor, the one-off seed loader and itself.
- * Rule 2 - no file outside the write API may call a write method on a ledger
- *          table (accounts, transactions, invoices, obligations, earmarks).
- * Rule 3 - the agent layer may never reach approvals or the executor, so the
- *          model cannot approve an action.
+ * Rule 2 - no file outside the write API may write a ledger table
+ *          (accounts, transactions, invoices, obligations, earmarks).
+ * Rule 3 - the agent layer may never reach approvals, the executor or the write
+ *          API, so the model cannot approve or execute.
  *
  * Exported so the Vitest suite runs exactly the same check as `npm run lint:boundary`.
  */
@@ -44,19 +44,42 @@ function toPosix(path) {
 }
 
 /**
+ * The statement that starts at `start`, with its newlines kept. It ends at the
+ * first semicolon or blank line and never runs past 400 characters, so a read on
+ * one line is not confused with a write to another table far below it. This is
+ * what catches a write split across lines: `db.earmarks` on one line and
+ * `.put(x)` on the next.
+ */
+function readStatement(text, start) {
+  const window = text.slice(start, start + 400);
+  const end = window.search(/;|\r?\n\s*\r?\n/);
+  return end === -1 ? window : window.slice(0, end);
+}
+
+/**
  * @param {string} rootDir absolute path of the repository root
  * @returns {{ violations: Array<{file: string, line: number, rule: string, reason: string}>, checked: number }}
  */
 export function scanLedgerWrites(rootDir) {
   const violations = [];
-  const srcDir = join(rootDir, 'src');
-  const files = walk(srcDir);
+  const files = walk(join(rootDir, 'src'));
+  const tablePattern = new RegExp(`\\bdb\\.(${LEDGER_TABLES.join('|')})\\b`);
+  const methodPattern = new RegExp(`\\.(${WRITE_METHODS})\\(`);
 
   for (const file of files) {
     const relativePath = toPosix(relative(rootDir, file));
-    const lines = readFileSync(file, 'utf8').split(/\r\n|\n|\r/);
+    const text = readFileSync(file, 'utf8');
+    const lines = text.split(/\r\n|\n|\r/);
     const allowedToImport = LEDGER_WRITE_ALLOWLIST.includes(relativePath);
     const isWriteModule = relativePath === 'src/storage/ledger-writes.ts';
+    const reportedLines = new Set();
+
+    const lineStarts = [];
+    let offset = 0;
+    for (const line of lines) {
+      lineStarts.push(offset);
+      offset += line.length + 1;
+    }
 
     lines.forEach((line, index) => {
       const lineNumber = index + 1;
@@ -70,10 +93,10 @@ export function scanLedgerWrites(rootDir) {
         });
       }
 
-      if (!isWriteModule) {
-        const tablePattern = new RegExp(`\\bdb\\.(${LEDGER_TABLES.join('|')})\\b`);
-        const methodPattern = new RegExp(`\\.(${WRITE_METHODS})\\(`);
-        if (tablePattern.test(line) && methodPattern.test(line)) {
+      if (!isWriteModule && !reportedLines.has(lineNumber)) {
+        const statement = readStatement(text, lineStarts[index]);
+        if (tablePattern.test(statement) && methodPattern.test(statement)) {
+          reportedLines.add(lineNumber);
           violations.push({
             file: relativePath,
             line: lineNumber,

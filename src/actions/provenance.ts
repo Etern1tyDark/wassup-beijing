@@ -50,10 +50,3 @@ export function checkProvenance(provenance: Provenance, tier: ProposalTier): Pro
 
   return { ok: true, reason: null, violations: [] };
 }
-
-/** Untrusted fields that are safe to carry, for the audit payload. */
-export function untrustedFieldNames(provenance: Provenance): string[] {
-  return provenance.untrustedInputs.flatMap((input) => input.fields);
-}
-
-export { normaliseField as normaliseProvenanceField };

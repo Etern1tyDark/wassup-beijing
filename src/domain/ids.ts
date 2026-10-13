@@ -4,11 +4,6 @@ export function randomId(prefix: string): string {
   return `${prefix}_${uuid.slice(0, 16)}`;
 }
 
-/** Deterministic id used by fixtures and tests: `txn_0001`. */
-export function fixtureId(prefix: string, index: number, width = 4): string {
-  return `${prefix}_${String(index).padStart(width, '0')}`;
-}
-
 /** Hex id for idempotency keys and one-time tokens. */
 export function randomHex(bytes = 16): string {
   const buffer = new Uint8Array(bytes);

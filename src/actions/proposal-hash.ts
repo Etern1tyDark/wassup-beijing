@@ -25,8 +25,3 @@ export async function hashProposal(proposal: ProposalHashInput): Promise<string>
   };
   return `sha256:${await sha256Hex(canonicalJson(core))}`;
 }
-
-/** Stable identity for an idempotency key: same key, same intent. */
-export async function hashIntent(action: string, params: unknown): Promise<string> {
-  return `sha256:${await sha256Hex(canonicalJson({ action, params }))}`;
-}

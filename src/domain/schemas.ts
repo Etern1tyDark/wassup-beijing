@@ -214,8 +214,8 @@ export type FeatureFlags = z.infer<typeof FeatureFlagsSchema>;
 
 export const SettingsSchema = z.object({
   id: z.literal('app'),
-  perActionCap: MoneySchema,
-  dailyCap: MoneySchema,
+  perActionCap: MoneySchema.nonnegative(),
+  dailyCap: MoneySchema.nonnegative(),
   staleDataHours: z.number().int().positive(),
   /** PBKDF2-SHA256 string produced by src/actions/pin.ts. */
   pinHash: z.string().min(1),

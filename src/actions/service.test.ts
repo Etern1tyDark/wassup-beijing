@@ -229,6 +229,25 @@ describe('proposal lifecycle (ACT-3, ACT-6)', () => {
     expect((await w.audit.list()).at(-1)).toMatchObject({ event: 'refused' });
   });
 
+  it('refuses to execute a proposal whose stored params changed after approval', async () => {
+    const w = await world();
+    const proposed = await proposeEarmark(w, { amount: toMoney(1_000_000) });
+    if (proposed.kind !== 'proposal') throw new Error('expected a proposal');
+
+    const token = await w.issueToken(proposed.proposal.proposalId);
+    expect(
+      (await w.actions.approve({ proposalId: proposed.proposal.proposalId, token: token.token })).kind,
+    ).toBe('approved');
+
+    const stored = await w.repos.proposals.byId(proposed.proposal.proposalId);
+    await w.db.proposals.put({ ...stored!, params: { ...stored!.params, amount: 2_000_000 } });
+
+    const blocked = await w.actions.execute(proposed.proposal.proposalId);
+    expect(blocked.kind).toBe('blocked');
+    if (blocked.kind === 'blocked') expect(blocked.reason).toMatch(/changed after it was approved/);
+    expect(await w.repos.earmarks.all()).toEqual([]);
+  });
+
   it('refuses an undo when there is nothing to undo', async () => {
     const w = await world();
     expect(expectRefused(await w.actions.undoLast('user')).reason).toMatch(/nothing to undo/);
@@ -614,6 +633,14 @@ describe('T3 transfer (ACT-4, ACT-7)', () => {
 
     const undo = await w.actions.undoLast('user');
     if (undo.kind !== 'proposal') throw new Error('expected an undo proposal');
+
+    // Reversing a transfer between the user's own accounts moves no totals.
+    expect(undo.proposal.diff.safeToSpend).toEqual({
+      before: before.safeToSpend,
+      after: before.safeToSpend,
+    });
+    expect(undo.proposal.diff.activeEarmarks).toEqual({ before: 0, after: 0 });
+
     await approveAndExecute(w, undo.proposal.proposalId, TEST_DEMO_PIN);
 
     const restored = await w.actions.snapshot();
@@ -653,6 +680,73 @@ describe('T3 transfer (ACT-4, ACT-7)', () => {
       pin: TEST_DEMO_PIN,
     });
     expect(withPin.kind).toBe('approved');
+  });
+
+  it('refuses to execute a transfer after the T3 flag is turned off', async () => {
+    const w = await world();
+    await w.settings.update({ featureFlags: { simT3: true } }, TEST_DEMO_PIN);
+
+    const result = await w.actions.propose({
+      action: 'transfer',
+      params: transferParams({ amount: toMoney(1_000_000) }),
+      provenance: PROVENANCE,
+    });
+    if (result.kind !== 'proposal') throw new Error('expected a proposal');
+
+    const token = await w.issueToken(result.proposal.proposalId);
+    expect(
+      (
+        await w.actions.approve({
+          proposalId: result.proposal.proposalId,
+          token: token.token,
+          pin: TEST_DEMO_PIN,
+        })
+      ).kind,
+    ).toBe('approved');
+
+    // The kill switch is flipped after approval, before execution.
+    await w.settings.update({ featureFlags: { simT3: false } }, TEST_DEMO_PIN);
+
+    const blocked = await w.actions.execute(result.proposal.proposalId);
+    expect(blocked.kind).toBe('blocked');
+    if (blocked.kind === 'blocked') expect(blocked.reason).toMatch(/simulated transfers are disabled/);
+
+    const before = EXPECTED.totalBalance;
+    expect((await w.actions.snapshot()).totalBalance).toBe(before);
+    expect((await w.audit.list()).at(-1)).toMatchObject({ event: 'refused' });
+  });
+
+  it('serialises concurrent executions so the daily cap cannot be exceeded', async () => {
+    const w = await world();
+    await w.settings.update({ featureFlags: { simT3: true } }, TEST_DEMO_PIN);
+
+    // All three pass the guardrails when proposed, because nothing has moved yet.
+    const ids: string[] = [];
+    for (let index = 0; index < 3; index += 1) {
+      const result = await w.actions.propose({
+        action: 'transfer',
+        params: transferParams({ amount: toMoney(2_000_000) }),
+        provenance: PROVENANCE,
+      });
+      if (result.kind !== 'proposal') throw new Error('expected a proposal');
+      const token = await w.issueToken(result.proposal.proposalId);
+      await w.actions.approve({
+        proposalId: result.proposal.proposalId,
+        token: token.token,
+        pin: TEST_DEMO_PIN,
+      });
+      ids.push(result.proposal.proposalId);
+    }
+
+    const outcomes = await Promise.all(ids.map((id) => w.actions.execute(id)));
+
+    expect(outcomes.filter((outcome) => outcome.kind === 'executed')).toHaveLength(2);
+    expect(outcomes.filter((outcome) => outcome.kind === 'blocked')).toHaveLength(1);
+
+    const transfers = (await w.repos.transactions.all()).filter(
+      (transaction) => transaction.category === 'simulated-transfer' && transaction.amount < 0,
+    );
+    expect(transfers).toHaveLength(2);
   });
 
   it('refuses a transfer larger than the source account balance', async () => {

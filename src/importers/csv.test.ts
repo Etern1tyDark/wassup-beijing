@@ -101,6 +101,24 @@ describe('CSV importer rejects malformed rows (ING-2)', () => {
     expect(result.errors[0]).toMatchObject({ line: 2, reason: 'unterminated quoted field' });
   });
 
+  it('rejects text after a closing quote instead of gluing it on', () => {
+    const csv = `date,description,amount,balance,account
+2026-09-01,"abc"def,1000,1000,BCA-main
+`;
+    const result = parseStatementCsv(csv);
+    expect(result.ok).toBe(false);
+    expect(result.errors[0]).toMatchObject({ line: 2, reason: 'unexpected text after a closing quote' });
+  });
+
+  it('still accepts a quoted field followed by a separator', () => {
+    const csv = `date,description,amount,balance,account
+2026-09-01,"a, b",1000,1000,BCA-main
+`;
+    const result = parseStatementCsv(csv);
+    expect(result.ok).toBe(true);
+    expect(result.rows[0]?.description).toBe('a, b');
+  });
+
   it('never emits a transaction for a rejected row', () => {
     const result = parseStatementCsv(fixture('bad-rows.csv'));
     const transactions = rowsToTransactions(result.rows, { accountIdByName: { 'BCA-main': 'acc_bca' } });

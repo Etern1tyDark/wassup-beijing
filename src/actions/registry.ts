@@ -102,13 +102,3 @@ export function lookupAction(value: string): ActionDefinition | undefined {
 export function requiresApproval(tier: ProposalTier): boolean {
   return tier === 'T2' || tier === 'T3';
 }
-
-export const APPROVAL_TIERS: readonly ProposalTier[] = ['T2', 'T3'];
-
-/** Actions the executor knows how to apply. Anything else stays a stub. */
-export const IMPLEMENTED_ACTIONS: readonly ActionName[] = [
-  'earmark.create',
-  'earmark.delete',
-  'undo',
-  'transfer',
-];

@@ -49,6 +49,19 @@ export const SYSTEM_PROMPT = [
 export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
   const maxToolRounds = deps.maxToolRounds ?? 4;
 
+  /** A tool that throws (a stub, a closed database) becomes a tool error, not a crash. */
+  async function invokeSafely(name: string, args: unknown, context: ToolContext): Promise<ToolResult> {
+    try {
+      return await deps.tools.invoke(name, args, context);
+    } catch (error) {
+      return {
+        ok: false,
+        tool: name as ToolResult['tool'],
+        reason: error instanceof Error ? error.message : String(error),
+      };
+    }
+  }
+
   return {
     send: async (userMessage, context): Promise<TurnResult> => {
       const messages: ModelMessage[] = [
@@ -81,7 +94,7 @@ export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
         }
 
         for (const call of fresh) {
-          const result = await deps.tools.invoke(call.name, call.arguments, context);
+          const result = await invokeSafely(call.name, call.arguments, context);
           toolResults.push(result);
           messages.push({
             role: 'tool',

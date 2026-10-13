@@ -92,6 +92,23 @@ allowed:
 Anything else fails `npm run lint:boundary` and `src/storage/ledger-write-boundary.test.ts`,
 and the ESLint `no-restricted-imports` rule blocks it in the editor too.
 
+The checker works at statement level, so a write split over several lines
+(`db.earmarks` on one line, `.modify(...)` on the next) is caught as well. It also enforces
+that nothing under `src/agent/` imports `approvals`, `executor` or `ledger-writes`, and it has
+negative tests that prove it detects each of those violations.
+
+### The one bootstrap exception
+
+`loadSeedData` replaces the whole local database: the ledger, the proposals, the settings and
+the audit log. That is a bootstrap operation for the demo, not an action:
+
+- it is not in the action registry, so no proposal, tool call or chat message can reach it;
+- it is only reachable from the "Load seed data / Reset to seed data" button in the UI;
+- the button says what it does, and the ledger write allowlist lists this file explicitly.
+
+The AUD-2 guarantee - undo is a new entry, never a deletion - holds for everything that happens
+inside the running system. A full local reset is a different, deliberate operation.
+
 ## Consistency between the ledger and the audit log
 
 The executor writes the ledger first and then appends the audit entry. If the append fails it
@@ -101,7 +118,13 @@ entry.
 
 The audit chain is serialised in-process, so concurrent appends cannot fork it. Two hashes are
 computed per entry: `payloadHash` covers the business payload, and `hash` covers the entry
-itself plus `prevHash`.
+itself plus `prevHash`. Executions are serialised too, so two concurrent executions cannot both
+pass the same daily-cap check and both write.
+
+**Residual risk:** the chain proves that no entry was changed or removed _between_ two entries.
+It cannot prove that the last entries were not truncated, because there is no external anchor
+for the head hash. Exporting the log and verifying it with `npm run verify:audit` is the
+practical control; a timestamped head hash published elsewhere would close the gap.
 
 ## Money
 

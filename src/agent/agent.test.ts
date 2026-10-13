@@ -30,7 +30,11 @@ async function setup() {
   });
   const tools = createAgentTools({
     proposals: { propose: w.actions.propose.bind(w.actions) },
-    actions: w.actions,
+    actions: {
+      snapshot: () => w.actions.snapshot(),
+      ledgerInput: () => w.actions.ledgerInput(),
+      staleness: () => w.actions.staleness(),
+    },
     forecast: createForecastEngine(),
     policy: createPolicyExtractor(),
     coverage: createCoverageEngine(),
@@ -55,6 +59,18 @@ describe('agent tools (PRD Section 7)', () => {
     expect(names).not.toContain('approve');
     expect(names).not.toContain('execute');
     expect(names).not.toContain('settings.update');
+  });
+
+  it('hands the agent a narrowed service object with no approve or execute on it', async () => {
+    const { w } = await setup();
+    const agentActions = {
+      snapshot: () => w.actions.snapshot(),
+      ledgerInput: () => w.actions.ledgerInput(),
+      staleness: () => w.actions.staleness(),
+    };
+    expect(Object.keys(agentActions).sort()).toEqual(['ledgerInput', 'snapshot', 'staleness']);
+    expect('approve' in agentActions).toBe(false);
+    expect('execute' in agentActions).toBe(false);
   });
 
   it('rejects a tool name that is not in the registry', async () => {

@@ -51,6 +51,7 @@ function parseCsvLine(line: string): LineParse {
   const fields: string[] = [];
   let current = '';
   let inQuotes = false;
+  let justClosedQuote = false;
   let index = 0;
 
   while (index < line.length) {
@@ -63,6 +64,7 @@ function parseCsvLine(line: string): LineParse {
           continue;
         }
         inQuotes = false;
+        justClosedQuote = true;
         index += 1;
         continue;
       }
@@ -70,10 +72,26 @@ function parseCsvLine(line: string): LineParse {
       index += 1;
       continue;
     }
+    if (justClosedQuote) {
+      // Only a separator or the end of the line may follow a closing quote.
+      if (char === ',') {
+        fields.push(current);
+        current = '';
+        justClosedQuote = false;
+        index += 1;
+        continue;
+      }
+      if ((char ?? '').trim() === '') {
+        index += 1;
+        continue;
+      }
+      return { error: 'unexpected text after a closing quote' };
+    }
     if (char === '"') {
       if (current.trim() !== '') return { error: 'unexpected quote inside an unquoted field' };
       current = '';
       inQuotes = true;
+      justClosedQuote = false;
       index += 1;
       continue;
     }

@@ -23,6 +23,10 @@ Then open <http://localhost:5173> and press **Load seed data**. That writes the 
 synthetic dataset for the demo persona (Rina) into IndexedDB and anchors the demo clock to its
 as-of date. No API key, no network and no account are needed.
 
+**Load seed data / Reset to seed data replaces the whole local database**, including the audit
+log. It is the only bootstrap path, it is not an action, and nothing the model can call can
+reach it.
+
 Node 22.6 or newer is required (the seed and verify scripts use Node's TypeScript stripping).
 
 ### The golden path in the browser
@@ -71,7 +75,7 @@ npm run format:check && npm run lint && npm run lint:boundary && npm run typeche
 
 ## Tests
 
-150 unit, integration and UI tests plus one end-to-end smoke test.
+180 unit, integration and UI tests plus one end-to-end smoke test.
 
 | Area             | File(s)                                                 | Covers                                                            |
 | ---------------- | ------------------------------------------------------- | ----------------------------------------------------------------- |

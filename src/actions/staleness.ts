@@ -1,4 +1,4 @@
-import { hoursBetween, type Clock } from './clock';
+import { hoursBetween } from './clock';
 
 /**
  * PRD Section 6: data older than `Settings.staleDataHours` blocks T2 and T3
@@ -32,9 +32,12 @@ export function evaluateStaleness(input: StalenessInput): StalenessReport {
   }
 
   const dataAsOf = new Date(Math.max(...candidates.map((candidate) => candidate.getTime())));
-  const ageHours = Math.round(hoursBetween(dataAsOf, input.now) * 10) / 10;
+  // Compare the exact age; round only for the message, so a ledger that is a
+  // minute past the limit is still blocked.
+  const exactAgeHours = hoursBetween(dataAsOf, input.now);
+  const ageHours = Math.round(exactAgeHours * 10) / 10;
 
-  if (ageHours > input.settings.staleDataHours) {
+  if (exactAgeHours > input.settings.staleDataHours) {
     return {
       stale: true,
       ageHours,
@@ -44,13 +47,4 @@ export function evaluateStaleness(input: StalenessInput): StalenessReport {
   }
 
   return { stale: false, ageHours, dataAsOf: dataAsOf.toISOString(), reason: null };
-}
-
-export async function readStaleness(
-  clock: Clock,
-  settings: { staleDataHours: number },
-  read: () => Promise<{ latestTransactionDate: string | null }>,
-): Promise<StalenessReport> {
-  const latest = await read();
-  return evaluateStaleness({ ...latest, settings, now: clock.now() });
 }

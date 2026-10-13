@@ -49,9 +49,14 @@ export function createAppServices(options: AppServicesOptions = {}): AppServices
   const gate = createOutboundGate({ db, repos, clock });
 
   const tools = createAgentTools({
-    // The agent gets propose() and nothing else.
+    // The agent gets a narrowed surface: it can propose and read, and the object
+    // it holds has no approve or execute method at all (not just in the types).
     proposals: { propose: actions.propose.bind(actions) },
-    actions,
+    actions: {
+      snapshot: () => actions.snapshot(),
+      ledgerInput: () => actions.ledgerInput(),
+      staleness: () => actions.staleness(),
+    },
     forecast: createForecastEngine(),
     policy: createPolicyExtractor(),
     coverage: createCoverageEngine(),

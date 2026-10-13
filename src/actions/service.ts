@@ -94,6 +94,16 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
   const { db, repos, audit, approvals, clock } = deps;
   const executor = createExecutor({ db, repos, audit, clock });
 
+  // Executions are serialised. Guardrails read the ledger and the write happens
+  // later, so two concurrent executions could otherwise both pass the same daily
+  // cap check and both write.
+  let executionTail: Promise<unknown> = Promise.resolve();
+  function enqueueExecution<T>(operation: () => Promise<T>): Promise<T> {
+    const next = executionTail.then(operation, operation);
+    executionTail = next.catch(() => undefined);
+    return next;
+  }
+
   async function settings(): Promise<Settings> {
     const current = await repos.settings.get();
     if (!current) throw new Error('settings are not initialised; load the seed data first');
@@ -219,14 +229,23 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
         const entry = await repos.audit.byId(parsed.params.auditEntryId);
         const original = entry?.proposalId ? await repos.proposals.byId(entry.proposalId) : undefined;
         const amount = typeof original?.params?.['amount'] === 'number' ? original.params['amount'] : 0;
-        const restored = toMoney(entry?.action === 'earmark.delete' ? -amount : amount);
+
+        // Reversing a transfer between the user's own accounts moves no totals
+        // and no earmarks, so the card must show no change.
+        if (entry?.action === 'transfer') {
+          return {
+            safeToSpend: { before: current.safeToSpend, after: current.safeToSpend },
+            freeCash: { before: current.freeCash, after: current.freeCash },
+            activeEarmarks: { before: count, after: count },
+          };
+        }
+
+        const releases = entry?.action === 'earmark.delete';
+        const restored = toMoney(releases ? -amount : amount);
         return {
           safeToSpend: { before: current.safeToSpend, after: addMoney(current.safeToSpend, restored) },
           freeCash: { before: current.freeCash, after: addMoney(current.freeCash, restored) },
-          activeEarmarks: {
-            before: count,
-            after: entry?.action === 'earmark.delete' ? count + 1 : Math.max(0, count - 1),
-          },
+          activeEarmarks: { before: count, after: releases ? count + 1 : Math.max(0, count - 1) },
         };
       }
     }
@@ -413,7 +432,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     return { kind: 'rejected' as const, reason: 'rejected by the user' };
   }
 
-  async function execute(proposalId: string): Promise<ExecuteResult> {
+  async function runExecution(proposalId: string): Promise<ExecuteResult> {
     const proposal = await repos.proposals.byId(proposalId);
     if (!proposal)
       return { kind: 'blocked', reason: `proposal ${proposalId} does not exist`, auditEntryId: null };
@@ -437,7 +456,43 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       };
     }
 
+    // The proposal must still hash to what was approved. Anything that changed
+    // the stored proposal after approval is refused here.
+    const currentHash = await hashProposal(proposal);
+    if (currentHash !== proposal.proposalHash) {
+      const entry = await audit.append({
+        actor: 'system',
+        event: 'refused',
+        action: proposal.action,
+        proposalId: proposal.proposalId,
+        detail: 'refused at execution: the proposal changed after it was approved',
+        payload: { reason: 'proposal-hash-mismatch' },
+      });
+      return {
+        kind: 'blocked',
+        reason: 'the proposal changed after it was approved',
+        auditEntryId: entry.id,
+      };
+    }
+
     const currentSettings = await settings();
+
+    // The T3 kill switch is re-read at execution time, not just at propose time.
+    if (proposal.tier === 'T3' && !currentSettings.featureFlags.simT3) {
+      const entry = await audit.append({
+        actor: 'system',
+        event: 'refused',
+        action: proposal.action,
+        proposalId: proposal.proposalId,
+        detail: 'refused at execution: simulated transfers are disabled',
+        payload: { reason: 'sim-t3-disabled' },
+      });
+      return {
+        kind: 'blocked',
+        reason: 'refused: simulated transfers are disabled. Nothing was moved.',
+        auditEntryId: entry.id,
+      };
+    }
 
     // Guardrails are checked again at execution time: the ledger may have moved
     // between approval and execution, and an approval is for a state, not a blank
@@ -533,7 +588,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     issueApprovalToken,
     approve,
     reject,
-    execute,
+    execute: (proposalId) => enqueueExecution(() => runExecution(proposalId)),
     pending,
     undoLast,
   };

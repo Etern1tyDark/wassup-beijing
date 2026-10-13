@@ -310,13 +310,20 @@ function BalancesPanel({
 function EarmarksPanel({
   earmarks,
   onRelease,
+  notice,
 }: {
   earmarks: Earmark[];
   onRelease: (earmarkId: string) => void;
+  notice: string | null;
 }) {
   return (
     <section className="card" data-testid="earmarks">
       <h3>Earmarks</h3>
+      {notice ? (
+        <p className="warning" role="status" data-testid="earmark-notice">
+          {notice}
+        </p>
+      ) : null}
       {earmarks.length === 0 ? (
         <p className="muted" data-testid="no-earmarks">
           Nothing set aside yet.
@@ -359,10 +366,12 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
   const services = useServices();
   const { state } = useAppStateContext();
   const [verification, setVerification] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const undo = async () => {
+    setNotice(null);
     const result = await services.actions.undoLast('user');
-    if (result.kind === 'refused') window.alert(result.reason);
+    if (result.kind === 'refused') setNotice(result.reason);
     onChanged();
   };
 
@@ -406,6 +415,12 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
       {verification ? (
         <p className="message" role="status" data-testid="audit-verification">
           {verification}
+        </p>
+      ) : null}
+
+      {notice ? (
+        <p className="warning" role="status" data-testid="audit-notice">
+          {notice}
         </p>
       ) : null}
 
@@ -582,22 +597,30 @@ function SettingsPanel({ settings, onChanged }: { settings: Settings | null; onC
 export function App() {
   const services = useServices();
   const { state, reload, loading } = useAppStateContext();
+  const [loadNotice, setLoadNotice] = useState<string | null>(null);
+  const [earmarkNotice, setEarmarkNotice] = useState<string | null>(null);
 
   const loadSeed = async () => {
-    const dataset = SeedDatasetSchema.parse(seedFixture);
-    await loadSeedData(services.db, dataset);
-    services.clock.anchorTo(dataset.asOf);
-    reload();
+    setLoadNotice(null);
+    try {
+      const dataset = SeedDatasetSchema.parse(seedFixture);
+      await loadSeedData(services.db, dataset);
+      services.clock.anchorTo(dataset.asOf);
+      reload();
+    } catch (error) {
+      setLoadNotice(error instanceof Error ? error.message : String(error));
+    }
   };
 
   const releaseEarmark = async (earmarkId: string) => {
+    setEarmarkNotice(null);
     const result = await services.actions.propose({
       action: 'earmark.delete',
       params: { earmarkId },
       provenance: { requestedBy: 'ui_earmark_list', untrustedInputs: [] },
       actor: 'user',
     });
-    if (result.kind === 'refused') window.alert(result.reason);
+    if (result.kind === 'refused') setEarmarkNotice(result.reason);
     reload();
   };
 
@@ -612,10 +635,16 @@ export function App() {
         </div>
         <div className="actions">
           <button type="button" className="primary" data-testid="load-seed" onClick={() => void loadSeed()}>
-            {state.loaded ? 'Reload seed data' : 'Load seed data'}
+            {state.loaded ? 'Reset to seed data' : 'Load seed data'}
           </button>
         </div>
       </header>
+
+      {loadNotice ? (
+        <p className="warning" role="alert" data-testid="load-notice">
+          {loadNotice}
+        </p>
+      ) : null}
 
       {!state.loaded ? (
         <section className="card empty-state" data-testid="empty-state">
@@ -634,7 +663,11 @@ export function App() {
 
           <div className="grid">
             <EarmarkForm onChanged={reload} />
-            <EarmarksPanel earmarks={state.earmarks} onRelease={(id) => void releaseEarmark(id)} />
+            <EarmarksPanel
+              earmarks={state.earmarks}
+              notice={earmarkNotice}
+              onRelease={(id) => void releaseEarmark(id)}
+            />
           </div>
 
           {state.pending.length > 0 ? (
