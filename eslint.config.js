@@ -39,7 +39,7 @@ export default tseslint.config(
   },
   {
     files: ['**/*.tsx', 'src/ui/**/*.ts'],
-    ...reactHooks.configs['recommended-latest'],
+    ...reactHooks.configs.flat.recommended,
   },
   {
     files: ['src/ui/**/*.{ts,tsx}'],

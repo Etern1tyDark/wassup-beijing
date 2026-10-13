@@ -1,0 +1,18 @@
+{
+  "name": "Permissioned personal-finance agent",
+  "short_name": "Ledger agent",
+  "description": "Local-first personal-finance agent with permission tiers, approvals and an append-only audit log.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#f6f7f5",
+  "theme_color": "#12352a",
+  "icons": [
+    {
+      "src": "/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
