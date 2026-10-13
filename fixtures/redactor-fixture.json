@@ -1,0 +1,28 @@
+{
+  "description": "Every identifier type the redactor must remove before a request leaves the browser (PRV-1).",
+  "names": ["Rina Wijaya", "Budi Santoso"],
+  "accountNumbers": ["1234567890", "9876543210"],
+  "policyNumbers": ["POL-H-2026-00123", "TRV-2026-77"],
+  "input": "Rina Wijaya (rina.wijaya@example.com) called from 081234567890 about NIK 3174012501990007, account 1234567890 and policy POL-H-2026-00123. Budi Santoso, budi@example.org, +6281234567890, account 9876543210, policy TRV-2026-77.",
+  "mustNotLeak": [
+    "Rina Wijaya",
+    "Budi Santoso",
+    "rina.wijaya@example.com",
+    "budi@example.org",
+    "081234567890",
+    "+6281234567890",
+    "3174012501990007",
+    "1234567890",
+    "9876543210",
+    "POL-H-2026-00123",
+    "TRV-2026-77"
+  ],
+  "expectedPlaceholders": [
+    "[REDACTED:EMAIL]",
+    "[REDACTED:NIK]",
+    "[REDACTED:PHONE]",
+    "[REDACTED:ACCOUNT-NUMBER]",
+    "[REDACTED:POLICY-NUMBER]",
+    "[REDACTED:NAME]"
+  ]
+}
