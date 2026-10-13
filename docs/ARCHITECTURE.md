@@ -55,6 +55,8 @@ model / UI form / chat
         ▼
    execute(proposalId)
         ├─ status must be 'approved'  → nothing changes before approval (ACT-3)
+        ├─ params re-validated        → blocked if the stored params are unusable
+        ├─ guardrails re-checked      → blocked, logged if the ledger moved (ACT-5)
         ├─ staleness check            → blocked, logged                     (ST8)
         ├─ idempotency key            → blocked if that intent already ran
         └─ apply the effect through the ONLY ledger writer
@@ -64,6 +66,11 @@ model / UI form / chat
 
 Undo is the same flow with `action: "undo"`: it proposes, needs approval, and writes a new
 audit entry (`event: "undone"`). Nothing is ever deleted from the audit log (AUD-2).
+
+Guardrails run twice on purpose: once when the proposal is built, and again immediately before
+the effect is applied. An approval is for a specific state of the ledger, so if the ledger moved
+between approval and execution (another earmark was executed, a transfer used up the daily cap)
+the proposal is refused and logged instead of being applied on stale arithmetic.
 
 ### Why the model cannot approve
 

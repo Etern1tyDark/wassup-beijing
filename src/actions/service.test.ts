@@ -205,6 +205,30 @@ describe('proposal lifecycle (ACT-3, ACT-6)', () => {
     expect(await w.repos.earmarks.all()).toEqual([]);
   });
 
+  it('re-checks the guardrails at execution time, so a stale approval cannot slip through', async () => {
+    const w = await world();
+    const first = await proposeEarmark(w, { amount: toMoney(9_000_000), label: 'First' });
+    if (first.kind !== 'proposal') throw new Error('expected a proposal');
+
+    const token = await w.issueToken(first.proposal.proposalId);
+    expect(
+      (await w.actions.approve({ proposalId: first.proposal.proposalId, token: token.token })).kind,
+    ).toBe('approved');
+
+    // The ledger moves after approval: another earmark eats the free cash.
+    const second = await proposeEarmark(w, { amount: toMoney(5_000_000), label: 'Second' });
+    if (second.kind !== 'proposal') throw new Error('expected a proposal');
+    await approveAndExecute(w, second.proposal.proposalId);
+
+    const blocked = await w.actions.execute(first.proposal.proposalId);
+    expect(blocked.kind).toBe('blocked');
+    if (blocked.kind === 'blocked') expect(blocked.reason).toMatch(/refused by guardrails/);
+
+    const earmarks = await w.repos.earmarks.all();
+    expect(earmarks.filter((earmark) => earmark.active)).toHaveLength(1);
+    expect((await w.audit.list()).at(-1)).toMatchObject({ event: 'refused' });
+  });
+
   it('refuses an undo when there is nothing to undo', async () => {
     const w = await world();
     expect(expectRefused(await w.actions.undoLast('user')).reason).toMatch(/nothing to undo/);

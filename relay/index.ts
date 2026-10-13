@@ -26,8 +26,15 @@ export interface RelayRequestBody {
 
 export const DEFAULT_MODEL_API_URL = 'https://api.example.invalid/v1/chat/completions';
 
+/**
+ * Read a value from the platform bindings (Cloudflare Workers style) or from the
+ * process environment (Node). `process` is absent on some edge runtimes, so it is
+ * never touched unless it exists.
+ */
 function readBinding(env: RelayBindings | undefined, key: keyof RelayBindings): string | undefined {
-  return env?.[key] ?? process.env[key];
+  if (env?.[key] !== undefined) return env[key];
+  if (typeof process !== 'undefined') return process.env[key];
+  return undefined;
 }
 
 export const app = new Hono<{ Bindings: RelayBindings }>();

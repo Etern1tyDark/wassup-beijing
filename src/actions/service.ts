@@ -438,6 +438,46 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     }
 
     const currentSettings = await settings();
+
+    // Guardrails are checked again at execution time: the ledger may have moved
+    // between approval and execution, and an approval is for a state, not a blank
+    // cheque. A proposal that no longer passes is refused and logged.
+    const reparsed = parseActionParams(proposal.action, proposal.params);
+    if (!reparsed.ok) {
+      const entry = await audit.append({
+        actor: 'system',
+        event: 'refused',
+        action: proposal.action,
+        proposalId: proposal.proposalId,
+        detail: `refused at execution: ${reparsed.reason}`,
+        payload: { reason: reparsed.reason },
+      });
+      return { kind: 'blocked', reason: reparsed.reason, auditEntryId: entry.id };
+    }
+
+    const [currentSnapshot, allEarmarks] = await Promise.all([snapshot(), repos.earmarks.all()]);
+    const rechecked = await guardrailsFor(reparsed.value, {
+      snapshot: currentSnapshot,
+      settings: currentSettings,
+      activeEarmarks: allEarmarks.filter((earmark) => earmark.active),
+    });
+
+    if (!allPass(rechecked)) {
+      const reasons = rechecked
+        .filter((result) => !result.pass)
+        .map((result) => `${result.rule}: ${result.detail}`)
+        .join('; ');
+      const entry = await audit.append({
+        actor: 'system',
+        event: 'refused',
+        action: proposal.action,
+        proposalId: proposal.proposalId,
+        detail: `refused at execution by guardrails: ${reasons}`,
+        payload: { guardrails: failedRules(rechecked) },
+      });
+      return { kind: 'blocked', reason: `refused by guardrails: ${reasons}`, auditEntryId: entry.id };
+    }
+
     const outcome = await executor.execute(proposal, currentSettings);
 
     if (!outcome.ok) {
