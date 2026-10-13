@@ -48,7 +48,10 @@ write(
 );
 
 write('fixtures/csv/adversarial.csv', ADVERSARIAL_CSV);
-write('fixtures/edge/earmark-over-free-cash.json', `${JSON.stringify(earmarkOverFreeCashFixture(), null, 2)}\n`);
+write(
+  'fixtures/edge/earmark-over-free-cash.json',
+  `${JSON.stringify(earmarkOverFreeCashFixture(), null, 2)}\n`,
+);
 write('fixtures/edge/stale-data.json', `${JSON.stringify(staleDataFixture(), null, 2)}\n`);
 
 console.log(`seed "${dataset.seed}" -> ${hash}`);

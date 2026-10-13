@@ -167,7 +167,10 @@ describe('outbound gate (PRV-1, PRV-2)', () => {
   });
 
   it('merges per-call identifiers with the gate configuration', async () => {
-    const gate = gateWith({ send: () => Promise.resolve({}) }, { names: [], accountNumbers: [], policyNumbers: [] });
+    const gate = gateWith(
+      { send: () => Promise.resolve({}) },
+      { names: [], accountNumbers: [], policyNumbers: [] },
+    );
 
     await gate.send({
       purpose: 'agent.complete',

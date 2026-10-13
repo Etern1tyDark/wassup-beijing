@@ -6,7 +6,13 @@ import { parseStatementCsv } from '../importers/csv';
 import { ACTION_NAMES, ACTION_REGISTRY } from './registry';
 import { GUARDRAIL_RULES } from './guardrails';
 import type { ProposeResult } from './service';
-import { createTestWorld, EXPECTED, TEST_DEMO_PIN, activeEarmarkFixture, type TestWorld } from '../testing/harness';
+import {
+  createTestWorld,
+  EXPECTED,
+  TEST_DEMO_PIN,
+  activeEarmarkFixture,
+  type TestWorld,
+} from '../testing/harness';
 
 const worlds: TestWorld[] = [];
 
@@ -247,7 +253,10 @@ describe('approval tokens (PRD Section 6, ST7)', () => {
 
     const token = await w.issueToken(first.proposal.proposalId);
     const result = await w.actions.approve({ proposalId: second.proposal.proposalId, token: token.token });
-    expect(result).toEqual({ kind: 'rejected', reason: 'this approval token belongs to a different proposal' });
+    expect(result).toEqual({
+      kind: 'rejected',
+      reason: 'this approval token belongs to a different proposal',
+    });
   });
 
   it('rejects an expired proposal', async () => {
@@ -384,9 +393,7 @@ describe('provenance (PRD Section 6, ST2 to ST4)', () => {
 
   it('rejects a proposal whose amount comes from the adversarial CSV text', async () => {
     const w = await world();
-    const csv = parseStatementCsv(
-      readFileSync(fileURLToPath(new URL('adversarial.csv', fixtures)), 'utf8'),
-    );
+    const csv = parseStatementCsv(readFileSync(fileURLToPath(new URL('adversarial.csv', fixtures)), 'utf8'));
     const flagged = csv.rows.find((row) => row.injectionSignal);
     expect(flagged).toBeDefined();
 
@@ -602,7 +609,10 @@ describe('T3 transfer (ACT-4, ACT-7)', () => {
     if (result.kind !== 'proposal') throw new Error('expected a proposal');
 
     const token = await w.issueToken(result.proposal.proposalId);
-    const withoutPin = await w.actions.approve({ proposalId: result.proposal.proposalId, token: token.token });
+    const withoutPin = await w.actions.approve({
+      proposalId: result.proposal.proposalId,
+      token: token.token,
+    });
     expect(withoutPin).toEqual({ kind: 'rejected', reason: 'step-up PIN required for a simulated transfer' });
 
     const wrongPin = await w.actions.approve({
@@ -646,9 +656,9 @@ describe('staleness (ST8)', () => {
     const proposed = await proposeEarmark(w);
     if (proposed.kind !== 'proposal') throw new Error('expected a proposal');
     const token = await w.issueToken(proposed.proposal.proposalId);
-    expect((await w.actions.approve({ proposalId: proposed.proposal.proposalId, token: token.token })).kind).toBe(
-      'approved',
-    );
+    expect(
+      (await w.actions.approve({ proposalId: proposed.proposal.proposalId, token: token.token })).kind,
+    ).toBe('approved');
 
     w.setNow('2026-10-16T09:00:00+07:00');
     const blocked = await w.actions.execute(proposed.proposal.proposalId);
@@ -687,7 +697,11 @@ describe('settings (PRD Section 6, ST6)', () => {
     const w = await world();
     for (const name of ['settings.update', 'settings.set', 'admin.setLimits', 'set_perActionCap']) {
       const refused = expectRefused(
-        await w.actions.propose({ action: name, params: { perActionCap: toMoney(999_999_999) }, provenance: PROVENANCE }),
+        await w.actions.propose({
+          action: name,
+          params: { perActionCap: toMoney(999_999_999) },
+          provenance: PROVENANCE,
+        }),
       );
       expect(refused.reason).toMatch(/not in the action registry/);
     }

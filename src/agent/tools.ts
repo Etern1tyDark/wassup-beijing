@@ -37,7 +37,11 @@ function describe(name: ActionName, parameters: Record<string, string>): ToolDes
 export function createAgentTools(deps: AgentToolDeps): AgentTools {
   const tools = new Map<ActionName, AgentTool>();
 
-  const register = (name: ActionName, parameters: Record<string, string>, invoke: AgentTool['invoke']): void => {
+  const register = (
+    name: ActionName,
+    parameters: Record<string, string>,
+    invoke: AgentTool['invoke'],
+  ): void => {
     tools.set(name, { descriptor: describe(name, parameters), invoke });
   };
 
@@ -50,7 +54,11 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
     return {
       ok: true,
       tool: 'get_summary',
-      data: summarise(snapshot, ledger.earmarks.filter((earmark) => earmark.active), staleness.stale),
+      data: summarise(
+        snapshot,
+        ledger.earmarks.filter((earmark) => earmark.active),
+        staleness.stale,
+      ),
     };
   });
 
@@ -74,17 +82,27 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
   });
 
   register('run_scenario', { invoiceId: 'string', daysLate: 'number', extraExpense: 'number' }, () =>
-    Promise.reject(new Error('FC-3 is not implemented yet: run_scenario returns nothing until the forecast engine lands')),
+    Promise.reject(
+      new Error('FC-3 is not implemented yet: run_scenario returns nothing until the forecast engine lands'),
+    ),
   );
 
-  register('list_policies', {}, () => Promise.resolve({ ok: true as const, tool: 'list_policies' as const, data: [] }));
+  register('list_policies', {}, () =>
+    Promise.resolve({ ok: true as const, tool: 'list_policies' as const, data: [] }),
+  );
 
   register('get_coverage', { policyId: 'string', event: 'string' }, () =>
-    Promise.reject(new Error('POL-2 is not implemented yet: get_coverage returns nothing until the coverage engine lands')),
+    Promise.reject(
+      new Error('POL-2 is not implemented yet: get_coverage returns nothing until the coverage engine lands'),
+    ),
   );
 
   register('compare_policies', { policyIds: 'string[]', criteria: 'string[]' }, () =>
-    Promise.reject(new Error('POL-4 is not implemented yet: compare_policies returns nothing until the coverage engine lands')),
+    Promise.reject(
+      new Error(
+        'POL-4 is not implemented yet: compare_policies returns nothing until the coverage engine lands',
+      ),
+    ),
   );
 
   register('draft_reminder', { invoiceId: 'string', tone: 'string' }, async (args) => {
@@ -117,8 +135,10 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
 
   register('undo', { auditEntryId: 'string' }, (args, context) => propose('undo', args, context));
 
-  register('transfer', { fromAccountId: 'string', toAccountId: 'string', amount: 'number' }, (args, context) =>
-    propose('transfer', args, context),
+  register(
+    'transfer',
+    { fromAccountId: 'string', toAccountId: 'string', amount: 'number' },
+    (args, context) => propose('transfer', args, context),
   );
 
   async function propose(name: ActionName, args: unknown, context: ToolContext): Promise<ToolResult> {
@@ -143,11 +163,19 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
     descriptors: () => [...tools.values()].map((tool) => tool.descriptor),
     invoke: async (name, args, context) => {
       if (!lookupAction(name)) {
-        return { ok: false, tool: name as ActionName, reason: `"${name}" is not in the action registry (ACT-1)` };
+        return {
+          ok: false,
+          tool: name as ActionName,
+          reason: `"${name}" is not in the action registry (ACT-1)`,
+        };
       }
       const tool = tools.get(name as ActionName);
       if (!tool) {
-        return { ok: false, tool: name as ActionName, reason: `"${name}" is registered but not implemented yet` };
+        return {
+          ok: false,
+          tool: name as ActionName,
+          reason: `"${name}" is registered but not implemented yet`,
+        };
       }
       return tool.invoke(args, context);
     },

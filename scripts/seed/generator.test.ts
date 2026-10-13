@@ -78,7 +78,9 @@ describe('seeded dataset covers the PRD shape (PRD Section 8)', () => {
     for (const category of ['housing', 'utilities', 'subscriptions', 'groceries', 'income']) {
       expect(categories.has(category), `missing category ${category}`).toBe(true);
     }
-    expect(dataset.transactions.filter((transaction) => transaction.category === 'irregular')).toHaveLength(2);
+    expect(dataset.transactions.filter((transaction) => transaction.category === 'irregular')).toHaveLength(
+      2,
+    );
   });
 
   it('has one open late invoice that creates the golden-path gap', () => {
@@ -89,7 +91,10 @@ describe('seeded dataset covers the PRD shape (PRD Section 8)', () => {
   });
 
   it('keeps the ledger fresh enough to pass the staleness guard', () => {
-    const latest = dataset.transactions.map((transaction) => transaction.date).sort().at(-1);
+    const latest = dataset.transactions
+      .map((transaction) => transaction.date)
+      .sort()
+      .at(-1);
     expect(latest).toBe(SEED_AS_OF);
   });
 
@@ -103,7 +108,10 @@ describe('seeded dataset covers the PRD shape (PRD Section 8)', () => {
 
 describe('generated adversarial and edge fixtures', () => {
   it('writes an adversarial CSV whose description field carries an instruction', () => {
-    const written = readFileSync(fileURLToPath(new URL('../../fixtures/csv/adversarial.csv', import.meta.url)), 'utf8');
+    const written = readFileSync(
+      fileURLToPath(new URL('../../fixtures/csv/adversarial.csv', import.meta.url)),
+      'utf8',
+    );
     expect(written).toBe(ADVERSARIAL_CSV);
 
     const parsed = parseStatementCsv(written);
@@ -113,7 +121,10 @@ describe('generated adversarial and edge fixtures', () => {
 
   it('writes the earmark-over-free-cash fixture', () => {
     const written = JSON.parse(
-      readFileSync(fileURLToPath(new URL('../../fixtures/edge/earmark-over-free-cash.json', import.meta.url)), 'utf8'),
+      readFileSync(
+        fileURLToPath(new URL('../../fixtures/edge/earmark-over-free-cash.json', import.meta.url)),
+        'utf8',
+      ),
     ) as unknown;
     expect(written).toEqual(earmarkOverFreeCashFixture());
   });
@@ -127,7 +138,10 @@ describe('generated adversarial and edge fixtures', () => {
 
   it('dates the stale fixture more than a day behind its clock', () => {
     const fixture = staleDataFixture();
-    const latest = fixture.ledger.transactions.map((transaction) => transaction.date).sort().at(-1) as IsoDate;
+    const latest = fixture.ledger.transactions
+      .map((transaction) => transaction.date)
+      .sort()
+      .at(-1) as IsoDate;
     expect(addDays(latest, 1) < (fixture.now ?? '').slice(0, 10)).toBe(true);
   });
 });

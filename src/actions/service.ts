@@ -298,14 +298,22 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       tier: definition.tier,
       params: parsed.value.params as Record<string, unknown>,
       provenance: input.provenance,
-      diff: await diffFor(parsed.value, currentSnapshot, earmarks.filter((earmark) => earmark.active)),
+      diff: await diffFor(
+        parsed.value,
+        currentSnapshot,
+        earmarks.filter((earmark) => earmark.active),
+      ),
       guardrails,
       expiresAt: new Date(now.getTime() + PROPOSAL_TTL_MINUTES * 60_000).toISOString(),
       idempotencyKey: input.idempotencyKey ?? randomHex(16),
       createdAt: now.toISOString(),
     };
 
-    const proposal = ProposalSchema.parse({ ...unsigned, status: 'pending', proposalHash: await hashProposal(unsigned) });
+    const proposal = ProposalSchema.parse({
+      ...unsigned,
+      status: 'pending',
+      proposalHash: await hashProposal(unsigned),
+    });
     await db.proposals.put(proposal);
 
     await audit.append({
@@ -330,11 +338,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     return approvals.issue(proposal, clock.now());
   }
 
-  async function approve(input: {
-    proposalId: string;
-    token: string;
-    pin?: string;
-  }): Promise<ApproveResult> {
+  async function approve(input: { proposalId: string; token: string; pin?: string }): Promise<ApproveResult> {
     const proposal = await repos.proposals.byId(input.proposalId);
     if (!proposal) return { kind: 'rejected', reason: `proposal ${input.proposalId} does not exist` };
     if (proposal.status !== 'pending') {
@@ -411,7 +415,8 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
 
   async function execute(proposalId: string): Promise<ExecuteResult> {
     const proposal = await repos.proposals.byId(proposalId);
-    if (!proposal) return { kind: 'blocked', reason: `proposal ${proposalId} does not exist`, auditEntryId: null };
+    if (!proposal)
+      return { kind: 'blocked', reason: `proposal ${proposalId} does not exist`, auditEntryId: null };
     if (proposal.status !== 'approved') {
       return {
         kind: 'blocked',

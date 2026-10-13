@@ -25,8 +25,9 @@ try {
   process.exit(2);
 }
 
-const entries =
-  Array.isArray(parsed) ? parsed : ((parsed as { entries?: unknown } | null)?.entries as unknown[] | undefined);
+const entries = Array.isArray(parsed)
+  ? parsed
+  : ((parsed as { entries?: unknown } | null)?.entries as unknown[] | undefined);
 
 if (!Array.isArray(entries)) {
   console.error('expected an array of entries, or an export object with an "entries" array');

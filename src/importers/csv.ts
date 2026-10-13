@@ -101,7 +101,12 @@ export function parseStatementCsv(text: string): CsvImportResult {
   const firstContentLine = lines.findIndex((line) => line.trim() !== '');
 
   if (firstContentLine === -1) {
-    return { ok: false, rows, errors: [{ line: 1, reason: 'file is empty; a header row is required', raw: '' }], accountNames: [] };
+    return {
+      ok: false,
+      rows,
+      errors: [{ line: 1, reason: 'file is empty; a header row is required', raw: '' }],
+      accountNames: [],
+    };
   }
 
   const headerLineNumber = firstContentLine + 1;
@@ -110,13 +115,22 @@ export function parseStatementCsv(text: string): CsvImportResult {
     return {
       ok: false,
       rows,
-      errors: [{ line: headerLineNumber, reason: `header row: ${headerParsed.error}`, raw: lines[firstContentLine] ?? '' }],
+      errors: [
+        {
+          line: headerLineNumber,
+          reason: `header row: ${headerParsed.error}`,
+          raw: lines[firstContentLine] ?? '',
+        },
+      ],
       accountNames: [],
     };
   }
 
   const header = headerParsed.fields.map((field) => field.trim().toLowerCase());
-  if (header.length !== CSV_HEADER.length || !CSV_HEADER.every((name, position) => header[position] === name)) {
+  if (
+    header.length !== CSV_HEADER.length ||
+    !CSV_HEADER.every((name, position) => header[position] === name)
+  ) {
     return {
       ok: false,
       rows,

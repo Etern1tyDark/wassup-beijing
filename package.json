@@ -19,8 +19,9 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "e2e": "playwright test",
-    "seed": "node scripts/seed/cli.ts",
-    "verify:audit": "node src/audit/verify-cli.ts"
+    "seed": "node --experimental-strip-types scripts/seed/cli.ts",
+    "verify:audit": "node --experimental-strip-types src/audit/verify-cli.ts",
+    "relay:dev": "node --experimental-strip-types relay/dev-server.ts"
   },
   "dependencies": {
     "@hono/node-server": "^2.1.4",

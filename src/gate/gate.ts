@@ -99,10 +99,7 @@ export function createOutboundGate(deps: OutboundGateDeps): OutboundGate {
           ...(message.redactorConfig?.accountNumbers ?? []),
           ...redactor.config().accountNumbers,
         ],
-        policyNumbers: [
-          ...(message.redactorConfig?.policyNumbers ?? []),
-          ...redactor.config().policyNumbers,
-        ],
+        policyNumbers: [...(message.redactorConfig?.policyNumbers ?? []), ...redactor.config().policyNumbers],
       };
 
       const { value: payload, redactions } = redactValue(message.payload, config);

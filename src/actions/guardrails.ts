@@ -1,12 +1,7 @@
 import { formatRupiah, minMoney, subMoney, sumMoney, toMoney, type Money } from '../domain/money';
 import type { Account, AuditEntry, Earmark, GuardrailResult, Settings } from '../domain/schemas';
 import type { LedgerSnapshot } from '../ledger/engine';
-import type {
-  EarmarkCreateParams,
-  EarmarkDeleteParams,
-  TransferParams,
-  UndoParams,
-} from './params';
+import type { EarmarkCreateParams, EarmarkDeleteParams, TransferParams, UndoParams } from './params';
 
 /**
  * ACT-5 / PRD Section 6: the guardrails that stand between a proposal and the
@@ -58,7 +53,10 @@ export function checkEarmarkCreateGuardrails(
 
   results.push(
     params.amount <= snapshot.freeCash
-      ? pass(GUARDRAIL_RULES.freeCash, `${formatRupiah(params.amount)} of ${formatRupiah(snapshot.freeCash)} free cash`)
+      ? pass(
+          GUARDRAIL_RULES.freeCash,
+          `${formatRupiah(params.amount)} of ${formatRupiah(snapshot.freeCash)} free cash`,
+        )
       : fail(
           GUARDRAIL_RULES.freeCash,
           `${formatRupiah(params.amount)} exceeds free cash of ${formatRupiah(snapshot.freeCash)}`,
@@ -94,7 +92,10 @@ export function checkEarmarkCreateGuardrails(
 
   results.push(
     context.activeEarmarkCount < MAX_ACTIVE_EARMARKS
-      ? pass(GUARDRAIL_RULES.maxActiveEarmarks, `${context.activeEarmarkCount} of ${MAX_ACTIVE_EARMARKS} active`)
+      ? pass(
+          GUARDRAIL_RULES.maxActiveEarmarks,
+          `${context.activeEarmarkCount} of ${MAX_ACTIVE_EARMARKS} active`,
+        )
       : fail(
           GUARDRAIL_RULES.maxActiveEarmarks,
           `${context.activeEarmarkCount} active earmarks already; the limit is ${MAX_ACTIVE_EARMARKS}`,
@@ -139,7 +140,10 @@ export function checkTransferGuardrails(
 
   if (from === undefined || to === undefined) {
     results.push(
-      fail(GUARDRAIL_RULES.transferOwnAccounts, 'one of the accounts is not in the ledger, so the user does not own it'),
+      fail(
+        GUARDRAIL_RULES.transferOwnAccounts,
+        'one of the accounts is not in the ledger, so the user does not own it',
+      ),
     );
   } else if (from.id === to.id) {
     results.push(fail(GUARDRAIL_RULES.transferOwnAccounts, 'source and destination are the same account'));

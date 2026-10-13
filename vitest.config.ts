@@ -5,7 +5,7 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'tests/unit/**/*.test.ts', 'scripts/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'src/**/*.test.tsx', 'scripts/**/*.test.ts', 'relay/**/*.test.ts'],
     exclude: ['node_modules/**', 'dist/**', 'tests/e2e/**'],
     setupFiles: ['src/test-setup.ts'],
     restoreMocks: true,

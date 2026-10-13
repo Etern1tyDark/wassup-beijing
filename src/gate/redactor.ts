@@ -72,12 +72,20 @@ export function redactText(input: string, config: RedactorConfig): { text: strin
 
   for (const accountNumber of config.accountNumbers) {
     if (accountNumber.length === 0) continue;
-    apply(new RegExp(`\\b${escapeRegExp(accountNumber)}\\b`, 'g'), 'account-number', () => PLACEHOLDERS['account-number']);
+    apply(
+      new RegExp(`\\b${escapeRegExp(accountNumber)}\\b`, 'g'),
+      'account-number',
+      () => PLACEHOLDERS['account-number'],
+    );
   }
 
   for (const policyNumber of config.policyNumbers) {
     if (policyNumber.length === 0) continue;
-    apply(new RegExp(`\\b${escapeRegExp(policyNumber)}\\b`, 'g'), 'policy-number', () => PLACEHOLDERS['policy-number']);
+    apply(
+      new RegExp(`\\b${escapeRegExp(policyNumber)}\\b`, 'g'),
+      'policy-number',
+      () => PLACEHOLDERS['policy-number'],
+    );
   }
 
   apply(NIK, 'nik', () => PLACEHOLDERS.nik);

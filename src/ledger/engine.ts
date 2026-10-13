@@ -1,7 +1,14 @@
-import { addDays, addMonths, addYears, isBefore, isOnOrAfter, monthsBetween, type IsoDate } from '../domain/time';
+import {
+  addDays,
+  addMonths,
+  addYears,
+  isBefore,
+  isOnOrAfter,
+  monthsBetween,
+  type IsoDate,
+} from '../domain/time';
 import { addMoney, subMoney, sumMoney, type Money } from '../domain/money';
 import type { Account, Earmark, Invoice, Obligation, Transaction } from '../domain/schemas';
-
 
 /**
  * LED-1 / LED-2: balances, free cash and safe-to-spend.

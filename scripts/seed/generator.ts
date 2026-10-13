@@ -105,7 +105,13 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
 
     for (const day of [2, 9, 16, 23]) {
       const account = random.bool(0.5) ? 'acc_gopay' : 'acc_bca';
-      pushTransaction(account, addDays(month, day), -random.int(250_000, 750_000), 'Grocery store', 'groceries');
+      pushTransaction(
+        account,
+        addDays(month, day),
+        -random.int(250_000, 750_000),
+        'Grocery store',
+        'groceries',
+      );
     }
 
     for (const client of clients) {
@@ -119,13 +125,7 @@ export function generateSeed(options: GenerateSeedOptions = {}): SeedDataset {
 
       if (isInWindow(paidDate, asOf)) {
         invoices.push({ id, client, amount, issueDate, dueDate, paidDate });
-        pushTransaction(
-          'acc_bca',
-          paidDate,
-          amount,
-          `Transfer in: ${client} invoice ${id}`,
-          'income',
-        );
+        pushTransaction('acc_bca', paidDate, amount, `Transfer in: ${client} invoice ${id}`, 'income');
       } else {
         invoices.push({ id, client, amount, issueDate, dueDate, paidDate: null });
       }

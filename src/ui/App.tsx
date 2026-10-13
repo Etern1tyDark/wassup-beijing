@@ -380,7 +380,9 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
   const verify = async () => {
     const result = await services.audit.verify();
     setVerification(
-      result.ok ? `Chain OK — ${result.checked} entries verified.` : `Chain FAILED — ${result.errors.join('; ')}`,
+      result.ok
+        ? `Chain OK — ${result.checked} entries verified.`
+        : `Chain FAILED — ${result.errors.join('; ')}`,
     );
   };
 
@@ -454,7 +456,10 @@ function PrivacyPanel({ outbound, onChanged }: { outbound: OutboundRequest[]; on
   }, [services, blocking]);
 
   const probe = async () => {
-    await services.gate.send({ purpose: 'privacy.probe', payload: { note: 'manual probe from the privacy panel' } });
+    await services.gate.send({
+      purpose: 'privacy.probe',
+      payload: { note: 'manual probe from the privacy panel' },
+    });
     onChanged();
   };
 
@@ -488,7 +493,9 @@ function PrivacyPanel({ outbound, onChanged }: { outbound: OutboundRequest[]; on
               <strong>{request.purpose}</strong> · {formatTimestamp(request.time)} ·{' '}
               <span className={`event event-${request.status}`}>{request.status}</span>
               {request.redactions.length > 0 ? (
-                <div className="redactions">redacted: {request.redactions.map((item) => item.kind).join(', ')}</div>
+                <div className="redactions">
+                  redacted: {request.redactions.map((item) => item.kind).join(', ')}
+                </div>
               ) : null}
             </li>
           ))}
@@ -618,7 +625,11 @@ export function App() {
       ) : (
         <>
           {state.snapshot ? (
-            <BalancesPanel snapshot={state.snapshot} staleness={state.staleness} accounts={state.accountTypes} />
+            <BalancesPanel
+              snapshot={state.snapshot}
+              staleness={state.staleness}
+              accounts={state.accountTypes}
+            />
           ) : null}
 
           <div className="grid">

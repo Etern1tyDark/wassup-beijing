@@ -105,7 +105,12 @@ export function createExecutor(deps: ExecutorDeps): Executor {
       case 'transfer':
         return applyTransfer(proposal, params as TransferParams);
       default:
-        return { ok: false, reason: `no executor for ${proposal.action}`, detail: 'unimplemented', auditEntryId: null };
+        return {
+          ok: false,
+          reason: `no executor for ${proposal.action}`,
+          detail: 'unimplemented',
+          auditEntryId: null,
+        };
     }
   }
 
@@ -161,7 +166,12 @@ export function createExecutor(deps: ExecutorDeps): Executor {
         detail: `released earmark ${params.earmarkId}`,
         payload: { earmarkId: params.earmarkId },
       });
-      return { ok: true, reason: null, detail: `earmark ${params.earmarkId} released`, auditEntryId: entry.id };
+      return {
+        ok: true,
+        reason: null,
+        detail: `earmark ${params.earmarkId} released`,
+        auditEntryId: entry.id,
+      };
     } catch (error) {
       await setEarmarkActive(db, params.earmarkId, true);
       throw error;
@@ -173,7 +183,12 @@ export function createExecutor(deps: ExecutorDeps): Executor {
     const from = accounts.find((account) => account.id === params.fromAccountId);
     const to = accounts.find((account) => account.id === params.toAccountId);
     if (!from || !to) {
-      return { ok: false, reason: 'one of the accounts no longer exists', detail: 'refused', auditEntryId: null };
+      return {
+        ok: false,
+        reason: 'one of the accounts no longer exists',
+        detail: 'refused',
+        auditEntryId: null,
+      };
     }
 
     const auditId = randomId('aud');
@@ -248,7 +263,11 @@ export function createExecutor(deps: ExecutorDeps): Executor {
         // The convention: an undo entry points at the proposal it reverts.
         proposalId: original.proposalId,
         detail: `undid ${original.action ?? 'action'} (audit ${original.id}): ${reversal.detail}`,
-        payload: { undoneAuditEntryId: original.id, action: original.action, undoProposalId: proposal.proposalId },
+        payload: {
+          undoneAuditEntryId: original.id,
+          action: original.action,
+          undoProposalId: proposal.proposalId,
+        },
       });
       return { ok: true, reason: null, detail: reversal.detail, auditEntryId: entry.id };
     } catch (error) {
@@ -295,7 +314,11 @@ export function createExecutor(deps: ExecutorDeps): Executor {
       const fromAccountId = original?.params?.['fromAccountId'];
       const toAccountId = original?.params?.['toAccountId'];
       const amount = original?.params?.['amount'];
-      if (typeof fromAccountId !== 'string' || typeof toAccountId !== 'string' || typeof amount !== 'number') {
+      if (
+        typeof fromAccountId !== 'string' ||
+        typeof toAccountId !== 'string' ||
+        typeof amount !== 'number'
+      ) {
         return { ok: false, reason: 'cannot undo the transfer: the original proposal is incomplete' };
       }
 

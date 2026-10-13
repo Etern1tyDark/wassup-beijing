@@ -52,16 +52,12 @@ export type ParsedActionParams =
   | { action: 'undo'; params: UndoParams }
   | { action: 'transfer'; params: TransferParams };
 
-export type ParseParamsResult =
-  | { ok: true; value: ParsedActionParams }
-  | { ok: false; reason: string };
+export type ParseParamsResult = { ok: true; value: ParsedActionParams } | { ok: false; reason: string };
 
 export function parseActionParams(action: string, raw: unknown): ParseParamsResult {
   const fail = (error: z.ZodError): ParseParamsResult => ({
     ok: false,
-    reason: error.issues
-      .map((issue) => `${issue.path.join('.') || 'params'}: ${issue.message}`)
-      .join('; '),
+    reason: error.issues.map((issue) => `${issue.path.join('.') || 'params'}: ${issue.message}`).join('; '),
   });
 
   switch (action) {

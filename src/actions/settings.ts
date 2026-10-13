@@ -18,9 +18,7 @@ export interface SettingsPatch {
   featureFlags?: Partial<FeatureFlags>;
 }
 
-export type SettingsUpdateResult =
-  | { ok: true; settings: Settings }
-  | { ok: false; reason: string };
+export type SettingsUpdateResult = { ok: true; settings: Settings } | { ok: false; reason: string };
 
 export interface SettingsService {
   get(): Promise<Settings>;

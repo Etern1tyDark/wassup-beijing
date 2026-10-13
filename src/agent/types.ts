@@ -17,8 +17,7 @@ export interface ToolDescriptor {
 }
 
 export type ToolResult =
-  | { ok: true; tool: ActionName; data: unknown }
-  | { ok: false; tool: ActionName; reason: string };
+  { ok: true; tool: ActionName; data: unknown } | { ok: false; tool: ActionName; reason: string };
 
 export interface ToolContext {
   /** Who asked, for provenance. */

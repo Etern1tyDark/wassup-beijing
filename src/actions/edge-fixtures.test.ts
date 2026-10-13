@@ -1,7 +1,13 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AccountSchema, EarmarkSchema, InvoiceSchema, ObligationSchema, TransactionSchema } from '../domain/schemas';
+import {
+  AccountSchema,
+  EarmarkSchema,
+  InvoiceSchema,
+  ObligationSchema,
+  TransactionSchema,
+} from '../domain/schemas';
 import { createTestWorld, type TestWorld } from '../testing/harness';
 import { GUARDRAIL_RULES } from './guardrails';
 import type { ProposeResult } from './service';
@@ -114,7 +120,10 @@ describe('edge fixture: empty and malformed CSVs (ING-2)', () => {
 
   it('rejects every row of the bad-dates fixture with a line number', async () => {
     const { parseStatementCsv } = await import('../importers/csv');
-    const raw = readFileSync(fileURLToPath(new URL('../../fixtures/csv/bad-dates.csv', import.meta.url)), 'utf8');
+    const raw = readFileSync(
+      fileURLToPath(new URL('../../fixtures/csv/bad-dates.csv', import.meta.url)),
+      'utf8',
+    );
     const result = parseStatementCsv(raw);
 
     expect(result.ok).toBe(false);
@@ -129,7 +138,13 @@ describe('seeded ledger drives the golden path', () => {
   it('produces a fresh ledger that passes every earmark guardrail', async () => {
     const dataset = JSON.parse(
       readFileSync(fileURLToPath(new URL('../../fixtures/seed/rina.json', import.meta.url)), 'utf8'),
-    ) as { asOf: string; accounts: unknown[]; transactions: unknown[]; invoices: unknown[]; obligations: unknown[] };
+    ) as {
+      asOf: string;
+      accounts: unknown[];
+      transactions: unknown[];
+      invoices: unknown[];
+      obligations: unknown[];
+    };
 
     const world = await createTestWorld({
       asOf: dataset.asOf,
