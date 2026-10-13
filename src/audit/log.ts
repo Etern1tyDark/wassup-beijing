@@ -10,6 +10,8 @@ import { GENESIS_PREV_HASH, hashEntry, hashPayload, verifyChain, type ChainVerif
  * as a new entry that points back at the original one.
  */
 export interface AppendAuditInput {
+  /** Explicit id, so a ledger write and its audit entry can share one identifier. */
+  id?: string;
   actor: AuditActor;
   event: AuditEvent;
   action?: string | null;
@@ -59,7 +61,7 @@ export function createAuditLog(db: AppDatabase, clock: () => Date): AuditLog {
       const payloadHash = await hashPayload(input.payload ?? null);
 
       const unsigned = {
-        id: randomId('aud'),
+        id: input.id ?? randomId('aud'),
         seq,
         time: clock().toISOString(),
         actor: input.actor,

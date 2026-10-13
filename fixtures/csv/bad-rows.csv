@@ -1,0 +1,7 @@
+date,description,amount,balance,account
+2026-09-01,Good row,1000000,1000000,BCA-main
+2026-09-02,Bad amount with separators,1.500.000,2500000,BCA-main
+2026-09-03,,500000,3000000,BCA-main
+2026-09-04,Missing column,500000,3500000
+2026-09-05,Bad balance,500000,not-a-number,BCA-main
+not-a-date,Bad date,500000,4000000,BCA-main

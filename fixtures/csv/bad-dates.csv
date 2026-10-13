@@ -1,0 +1,5 @@
+date,description,amount,balance,account
+2026-02-30,Impossible calendar date,1000,1000,BCA-main
+2026-13-01,Month thirteen,1000,1000,BCA-main
+01/02/2026,Day first format,1000,1000,BCA-main
+2026-09-01,Valid row,1000,1000,BCA-main

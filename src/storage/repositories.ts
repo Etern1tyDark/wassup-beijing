@@ -52,7 +52,7 @@ export interface Repositories {
     all(): Promise<Proposal[]>;
     byId(proposalId: string): Promise<Proposal | undefined>;
     byStatus(status: Proposal['status']): Promise<Proposal[]>;
-    byIdempotencyKey(key: string): Promise<Proposal | undefined>;
+    allByIdempotencyKey(key: string): Promise<Proposal[]>;
   };
   audit: {
     all(): Promise<AuditEntry[]>;
@@ -107,9 +107,9 @@ export function createRepositories(db: AppDatabase): Repositories {
       all: () => db.proposals.toArray(),
       byId: (proposalId) => db.proposals.get(proposalId),
       byStatus: (status) => db.proposals.where('status').equals(status).toArray(),
-      byIdempotencyKey: async (key) => {
+      allByIdempotencyKey: async (key) => {
         const matches = await db.proposals.toArray();
-        return matches.find((proposal) => proposal.idempotencyKey === key);
+        return matches.filter((proposal) => proposal.idempotencyKey === key);
       },
     },
     audit: {

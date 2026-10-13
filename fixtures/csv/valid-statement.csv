@@ -1,0 +1,6 @@
+date,description,amount,balance,account
+2026-09-01,Transfer in: Client Alpha invoice 0912,8500000,14250000,BCA-main
+2026-09-03,Rent October,-3500000,10750000,BCA-main
+2026-09-05,"Grocery store, Indomaret",-412500,10337500,BCA-main
+2026-09-07,Transfer in: Client Bravo invoice 0913,3200000,13537500,BCA-main
+2026-09-12,Studio equipment repair,-1000000,12537500,BCA-main

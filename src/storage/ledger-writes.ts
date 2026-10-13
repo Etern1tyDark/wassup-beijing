@@ -69,11 +69,9 @@ export async function addTransaction(db: AppDatabase, transaction: Transaction):
   if (validated === undefined) throw new Error('transaction validation produced no row');
   await db.transactions.put(validated);
 }
-
-export async function putTransaction(db: AppDatabase, transaction: Transaction): Promise<void> {
-  await addTransaction(db, transaction);
+export async function removeTransactions(db: AppDatabase, ids: readonly string[]): Promise<void> {
+  await db.transactions.bulkDelete([...ids]);
 }
-
 export async function clearLedger(db: AppDatabase): Promise<void> {
   await db.transaction(
     'rw',
