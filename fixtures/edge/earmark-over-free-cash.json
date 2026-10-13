@@ -1,0 +1,32 @@
+{
+  "name": "earmark larger than free cash",
+  "description": "ACT-5: the amount exceeds free cash, so the tier engine refuses the proposal.",
+  "asOf": "2026-10-13",
+  "ledger": {
+    "accounts": [
+      {
+        "id": "acc_bca",
+        "name": "BCA-main",
+        "type": "bank",
+        "currency": "IDR",
+        "openingBalance": 2000000
+      }
+    ],
+    "transactions": [],
+    "invoices": [],
+    "obligations": [],
+    "earmarks": []
+  },
+  "request": {
+    "action": "earmark.create",
+    "params": {
+      "label": "Too large to set aside",
+      "amount": 5000000,
+      "reviewDate": "2027-01-13"
+    }
+  },
+  "expected": {
+    "rule": "amount <= freeCash",
+    "freeCash": 2000000
+  }
+}

@@ -1,6 +1,6 @@
 import { z } from 'zod';
-import { MoneySchema } from './money';
-import { IsoDateSchema, IsoDateTimeSchema } from './time';
+import { MoneySchema } from './money.ts';
+import { IsoDateSchema, IsoDateTimeSchema } from './time.ts';
 
 /**
  * Entity schemas from PRD Section 8, frozen on day one.

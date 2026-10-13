@@ -1,0 +1,871 @@
+{
+  "seed": "rina-v1",
+  "persona": "Rina",
+  "generatedAt": "2026-10-13T00:00:00.000Z",
+  "asOf": "2026-10-13",
+  "accounts": [
+    {
+      "id": "acc_bca",
+      "name": "BCA-main",
+      "type": "bank",
+      "currency": "IDR",
+      "openingBalance": 4000000
+    },
+    {
+      "id": "acc_gopay",
+      "name": "GoPay",
+      "type": "e-wallet",
+      "currency": "IDR",
+      "openingBalance": 250000
+    },
+    {
+      "id": "acc_sandbox",
+      "name": "Sandbox savings",
+      "type": "sandbox-savings",
+      "currency": "IDR",
+      "openingBalance": 0
+    }
+  ],
+  "transactions": [
+    {
+      "id": "txn_0001",
+      "accountId": "acc_bca",
+      "date": "2026-05-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0004",
+      "accountId": "acc_bca",
+      "date": "2026-05-03",
+      "amount": -335782,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0005",
+      "accountId": "acc_bca",
+      "date": "2026-05-10",
+      "amount": -405473,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0006",
+      "accountId": "acc_bca",
+      "date": "2026-05-17",
+      "amount": -669957,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0010",
+      "accountId": "acc_bca",
+      "date": "2026-05-19",
+      "amount": 5371169,
+      "merchant": "Transfer in: Client Delta invoice inv_003",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0002",
+      "accountId": "acc_bca",
+      "date": "2026-05-20",
+      "amount": -448333,
+      "merchant": "PLN electricity and water",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0007",
+      "accountId": "acc_gopay",
+      "date": "2026-05-24",
+      "amount": -291980,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0003",
+      "accountId": "acc_bca",
+      "date": "2026-05-25",
+      "amount": -149000,
+      "merchant": "Subscriptions (design tools)",
+      "category": "subscriptions",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0008",
+      "accountId": "acc_bca",
+      "date": "2026-05-30",
+      "amount": 3878978,
+      "merchant": "Transfer in: Client Bravo invoice inv_001",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0012",
+      "accountId": "acc_bca",
+      "date": "2026-06-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0015",
+      "accountId": "acc_bca",
+      "date": "2026-06-03",
+      "amount": -413918,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0058",
+      "accountId": "acc_bca",
+      "date": "2026-06-07",
+      "amount": -1990806,
+      "merchant": "Studio equipment repair",
+      "category": "irregular",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0016",
+      "accountId": "acc_bca",
+      "date": "2026-06-10",
+      "amount": -418010,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0009",
+      "accountId": "acc_bca",
+      "date": "2026-06-13",
+      "amount": 2649926,
+      "merchant": "Transfer in: Client Epsilon invoice inv_002",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0017",
+      "accountId": "acc_gopay",
+      "date": "2026-06-17",
+      "amount": -325855,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0013",
+      "accountId": "acc_bca",
+      "date": "2026-06-20",
+      "amount": -402462,
+      "merchant": "PLN electricity and water",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0018",
+      "accountId": "acc_bca",
+      "date": "2026-06-24",
+      "amount": -269608,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0014",
+      "accountId": "acc_bca",
+      "date": "2026-06-25",
+      "amount": -149000,
+      "merchant": "Subscriptions (design tools)",
+      "category": "subscriptions",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0011",
+      "accountId": "acc_bca",
+      "date": "2026-06-30",
+      "amount": 6588577,
+      "merchant": "Transfer in: Client Charlie invoice inv_004",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0023",
+      "accountId": "acc_bca",
+      "date": "2026-07-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0026",
+      "accountId": "acc_bca",
+      "date": "2026-07-03",
+      "amount": -311855,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0027",
+      "accountId": "acc_bca",
+      "date": "2026-07-10",
+      "amount": -588043,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0028",
+      "accountId": "acc_bca",
+      "date": "2026-07-17",
+      "amount": -294119,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0021",
+      "accountId": "acc_bca",
+      "date": "2026-07-18",
+      "amount": 4175081,
+      "merchant": "Transfer in: Client Delta invoice inv_007",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0024",
+      "accountId": "acc_bca",
+      "date": "2026-07-20",
+      "amount": -505583,
+      "merchant": "PLN electricity and water",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0019",
+      "accountId": "acc_bca",
+      "date": "2026-07-21",
+      "amount": 8171964,
+      "merchant": "Transfer in: Client Bravo invoice inv_005",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0029",
+      "accountId": "acc_gopay",
+      "date": "2026-07-24",
+      "amount": -416520,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0025",
+      "accountId": "acc_bca",
+      "date": "2026-07-25",
+      "amount": -149000,
+      "merchant": "Subscriptions (design tools)",
+      "category": "subscriptions",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0022",
+      "accountId": "acc_bca",
+      "date": "2026-07-30",
+      "amount": 4491417,
+      "merchant": "Transfer in: Client Charlie invoice inv_008",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0031",
+      "accountId": "acc_bca",
+      "date": "2026-07-30",
+      "amount": 3783061,
+      "merchant": "Transfer in: Client Epsilon invoice inv_010",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0020",
+      "accountId": "acc_bca",
+      "date": "2026-07-31",
+      "amount": 6696812,
+      "merchant": "Transfer in: Client Epsilon invoice inv_006",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0034",
+      "accountId": "acc_bca",
+      "date": "2026-08-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0037",
+      "accountId": "acc_bca",
+      "date": "2026-08-03",
+      "amount": -384567,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0033",
+      "accountId": "acc_bca",
+      "date": "2026-08-05",
+      "amount": 4034046,
+      "merchant": "Transfer in: Client Charlie invoice inv_012",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0038",
+      "accountId": "acc_gopay",
+      "date": "2026-08-10",
+      "amount": -429900,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0059",
+      "accountId": "acc_bca",
+      "date": "2026-08-13",
+      "amount": -1529889,
+      "merchant": "Dental treatment",
+      "category": "irregular",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0039",
+      "accountId": "acc_bca",
+      "date": "2026-08-17",
+      "amount": -406884,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0035",
+      "accountId": "acc_bca",
+      "date": "2026-08-20",
+      "amount": -610476,
+      "merchant": "PLN electricity and water",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0043",
+      "accountId": "acc_bca",
+      "date": "2026-08-21",
+      "amount": 8015458,
+      "merchant": "Transfer in: Client Delta invoice inv_015",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0040",
+      "accountId": "acc_gopay",
+      "date": "2026-08-24",
+      "amount": -655276,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0036",
+      "accountId": "acc_bca",
+      "date": "2026-08-25",
+      "amount": -149000,
+      "merchant": "Subscriptions (design tools)",
+      "category": "subscriptions",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0044",
+      "accountId": "acc_bca",
+      "date": "2026-08-28",
+      "amount": 2852961,
+      "merchant": "Transfer in: Client Charlie invoice inv_016",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0032",
+      "accountId": "acc_bca",
+      "date": "2026-08-30",
+      "amount": 3983212,
+      "merchant": "Transfer in: Client Delta invoice inv_011",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0030",
+      "accountId": "acc_bca",
+      "date": "2026-09-01",
+      "amount": 4737035,
+      "merchant": "Transfer in: Client Bravo invoice inv_009",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0045",
+      "accountId": "acc_bca",
+      "date": "2026-09-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0048",
+      "accountId": "acc_bca",
+      "date": "2026-09-03",
+      "amount": -355513,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0049",
+      "accountId": "acc_bca",
+      "date": "2026-09-10",
+      "amount": -285814,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0042",
+      "accountId": "acc_bca",
+      "date": "2026-09-12",
+      "amount": 7261860,
+      "merchant": "Transfer in: Client Epsilon invoice inv_014",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0041",
+      "accountId": "acc_bca",
+      "date": "2026-09-15",
+      "amount": 3706196,
+      "merchant": "Transfer in: Client Bravo invoice inv_013",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0050",
+      "accountId": "acc_gopay",
+      "date": "2026-09-17",
+      "amount": -336532,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0053",
+      "accountId": "acc_bca",
+      "date": "2026-09-19",
+      "amount": 5035581,
+      "merchant": "Transfer in: Client Delta invoice inv_019",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0046",
+      "accountId": "acc_bca",
+      "date": "2026-09-20",
+      "amount": -630322,
+      "merchant": "PLN electricity and water",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0051",
+      "accountId": "acc_gopay",
+      "date": "2026-09-24",
+      "amount": -664739,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0047",
+      "accountId": "acc_bca",
+      "date": "2026-09-25",
+      "amount": -149000,
+      "merchant": "Subscriptions (design tools)",
+      "category": "subscriptions",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0052",
+      "accountId": "acc_bca",
+      "date": "2026-09-30",
+      "amount": 7599777,
+      "merchant": "Transfer in: Client Epsilon invoice inv_018",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0055",
+      "accountId": "acc_bca",
+      "date": "2026-10-01",
+      "amount": -3500000,
+      "merchant": "Rent",
+      "category": "housing",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0056",
+      "accountId": "acc_gopay",
+      "date": "2026-10-03",
+      "amount": -627857,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0054",
+      "accountId": "acc_bca",
+      "date": "2026-10-10",
+      "amount": 4280115,
+      "merchant": "Transfer in: Client Charlie invoice inv_020",
+      "category": "income",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0057",
+      "accountId": "acc_gopay",
+      "date": "2026-10-10",
+      "amount": -366445,
+      "merchant": "Grocery store",
+      "category": "groceries",
+      "source": "csv",
+      "untrusted": true
+    },
+    {
+      "id": "txn_0060",
+      "accountId": "acc_gopay",
+      "date": "2026-10-13",
+      "amount": -82512,
+      "merchant": "Mobile top-up",
+      "category": "utilities",
+      "source": "csv",
+      "untrusted": true
+    }
+  ],
+  "invoices": [
+    {
+      "id": "inv_001",
+      "client": "Client Bravo",
+      "amount": 3878978,
+      "issueDate": "2026-05-03",
+      "dueDate": "2026-05-17",
+      "paidDate": "2026-05-30"
+    },
+    {
+      "id": "inv_002",
+      "client": "Client Epsilon",
+      "amount": 2649926,
+      "issueDate": "2026-05-06",
+      "dueDate": "2026-05-20",
+      "paidDate": "2026-06-13"
+    },
+    {
+      "id": "inv_003",
+      "client": "Client Delta",
+      "amount": 5371169,
+      "issueDate": "2026-05-03",
+      "dueDate": "2026-05-17",
+      "paidDate": "2026-05-19"
+    },
+    {
+      "id": "inv_004",
+      "client": "Client Charlie",
+      "amount": 6588577,
+      "issueDate": "2026-05-12",
+      "dueDate": "2026-05-26",
+      "paidDate": "2026-06-30"
+    },
+    {
+      "id": "inv_005",
+      "client": "Client Bravo",
+      "amount": 8171964,
+      "issueDate": "2026-06-03",
+      "dueDate": "2026-06-17",
+      "paidDate": "2026-07-21"
+    },
+    {
+      "id": "inv_006",
+      "client": "Client Epsilon",
+      "amount": 6696812,
+      "issueDate": "2026-06-12",
+      "dueDate": "2026-06-26",
+      "paidDate": "2026-07-31"
+    },
+    {
+      "id": "inv_007",
+      "client": "Client Delta",
+      "amount": 4175081,
+      "issueDate": "2026-06-12",
+      "dueDate": "2026-06-26",
+      "paidDate": "2026-07-18"
+    },
+    {
+      "id": "inv_008",
+      "client": "Client Charlie",
+      "amount": 4491417,
+      "issueDate": "2026-06-05",
+      "dueDate": "2026-06-19",
+      "paidDate": "2026-07-30"
+    },
+    {
+      "id": "inv_009",
+      "client": "Client Bravo",
+      "amount": 4737035,
+      "issueDate": "2026-07-11",
+      "dueDate": "2026-07-25",
+      "paidDate": "2026-09-01"
+    },
+    {
+      "id": "inv_010",
+      "client": "Client Epsilon",
+      "amount": 3783061,
+      "issueDate": "2026-07-04",
+      "dueDate": "2026-07-18",
+      "paidDate": "2026-07-30"
+    },
+    {
+      "id": "inv_011",
+      "client": "Client Delta",
+      "amount": 3983212,
+      "issueDate": "2026-07-04",
+      "dueDate": "2026-07-18",
+      "paidDate": "2026-08-30"
+    },
+    {
+      "id": "inv_012",
+      "client": "Client Charlie",
+      "amount": 4034046,
+      "issueDate": "2026-07-08",
+      "dueDate": "2026-07-22",
+      "paidDate": "2026-08-05"
+    },
+    {
+      "id": "inv_013",
+      "client": "Client Bravo",
+      "amount": 3706196,
+      "issueDate": "2026-08-12",
+      "dueDate": "2026-08-26",
+      "paidDate": "2026-09-15"
+    },
+    {
+      "id": "inv_014",
+      "client": "Client Epsilon",
+      "amount": 7261860,
+      "issueDate": "2026-08-04",
+      "dueDate": "2026-08-18",
+      "paidDate": "2026-09-12"
+    },
+    {
+      "id": "inv_015",
+      "client": "Client Delta",
+      "amount": 8015458,
+      "issueDate": "2026-08-06",
+      "dueDate": "2026-08-20",
+      "paidDate": "2026-08-21"
+    },
+    {
+      "id": "inv_016",
+      "client": "Client Charlie",
+      "amount": 2852961,
+      "issueDate": "2026-08-08",
+      "dueDate": "2026-08-22",
+      "paidDate": "2026-08-28"
+    },
+    {
+      "id": "inv_017",
+      "client": "Client Bravo",
+      "amount": 7970136,
+      "issueDate": "2026-09-09",
+      "dueDate": "2026-09-23",
+      "paidDate": null
+    },
+    {
+      "id": "inv_018",
+      "client": "Client Epsilon",
+      "amount": 7599777,
+      "issueDate": "2026-09-06",
+      "dueDate": "2026-09-20",
+      "paidDate": "2026-09-30"
+    },
+    {
+      "id": "inv_019",
+      "client": "Client Delta",
+      "amount": 5035581,
+      "issueDate": "2026-09-04",
+      "dueDate": "2026-09-18",
+      "paidDate": "2026-09-19"
+    },
+    {
+      "id": "inv_020",
+      "client": "Client Charlie",
+      "amount": 4280115,
+      "issueDate": "2026-09-12",
+      "dueDate": "2026-09-26",
+      "paidDate": "2026-10-10"
+    },
+    {
+      "id": "inv_021",
+      "client": "Client Bravo",
+      "amount": 4087802,
+      "issueDate": "2026-10-06",
+      "dueDate": "2026-10-20",
+      "paidDate": null
+    },
+    {
+      "id": "inv_022",
+      "client": "Client Epsilon",
+      "amount": 5963539,
+      "issueDate": "2026-10-13",
+      "dueDate": "2026-10-27",
+      "paidDate": null
+    },
+    {
+      "id": "inv_023",
+      "client": "Client Delta",
+      "amount": 3489488,
+      "issueDate": "2026-10-13",
+      "dueDate": "2026-10-27",
+      "paidDate": null
+    },
+    {
+      "id": "inv_024",
+      "client": "Client Charlie",
+      "amount": 3230768,
+      "issueDate": "2026-10-11",
+      "dueDate": "2026-10-25",
+      "paidDate": null
+    },
+    {
+      "id": "inv_late",
+      "client": "Client Charlie",
+      "amount": 5052924,
+      "issueDate": "2026-08-29",
+      "dueDate": "2026-09-12",
+      "paidDate": null
+    }
+  ],
+  "obligations": [
+    {
+      "id": "obl_rent",
+      "label": "Rent",
+      "amount": 3500000,
+      "dueDate": "2026-11-01",
+      "recurrence": "monthly"
+    },
+    {
+      "id": "obl_utilities",
+      "label": "PLN electricity and water",
+      "amount": 592425,
+      "dueDate": "2026-10-20",
+      "recurrence": "monthly"
+    },
+    {
+      "id": "obl_subscriptions",
+      "label": "Subscriptions (design tools)",
+      "amount": 149000,
+      "dueDate": "2026-10-25",
+      "recurrence": "monthly"
+    },
+    {
+      "id": "obl_insurance",
+      "label": "Health insurance premium",
+      "amount": 2400000,
+      "dueDate": "2027-03-01",
+      "recurrence": "yearly"
+    },
+    {
+      "id": "obl_tax",
+      "label": "Annual tax instalment",
+      "amount": 1200000,
+      "dueDate": "2026-11-30",
+      "recurrence": "once"
+    }
+  ],
+  "earmarks": []
+}

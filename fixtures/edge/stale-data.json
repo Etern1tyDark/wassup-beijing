@@ -1,0 +1,44 @@
+{
+  "name": "data older than the staleness limit",
+  "description": "ST8: the ledger is 42 days old, so T2 execution is blocked until it is refreshed.",
+  "asOf": "2026-09-01",
+  "now": "2026-10-13T09:00:00+07:00",
+  "ledger": {
+    "accounts": [
+      {
+        "id": "acc_bca",
+        "name": "BCA-main",
+        "type": "bank",
+        "currency": "IDR",
+        "openingBalance": 20000000
+      }
+    ],
+    "transactions": [
+      {
+        "id": "txn_old_0001",
+        "accountId": "acc_bca",
+        "date": "2026-09-01",
+        "amount": 1000000,
+        "merchant": "Transfer in: Client Alpha invoice old",
+        "category": "income",
+        "source": "csv",
+        "untrusted": true
+      }
+    ],
+    "invoices": [],
+    "obligations": [],
+    "earmarks": []
+  },
+  "request": {
+    "action": "earmark.create",
+    "params": {
+      "label": "Medical reserve",
+      "amount": 1000000,
+      "reviewDate": "2027-01-13"
+    }
+  },
+  "expected": {
+    "stale": true,
+    "minAgeHours": 24
+  }
+}

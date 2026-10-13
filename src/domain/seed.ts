@@ -5,7 +5,7 @@ import {
   InvoiceSchema,
   ObligationSchema,
   TransactionSchema,
-} from './schemas';
+} from './schemas.ts';
 
 /**
  * The shape the synthetic data generator produces and the UI bootstraps from
