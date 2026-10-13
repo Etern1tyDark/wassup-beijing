@@ -1,0 +1,89 @@
+# Licences
+
+Every dependency is recorded here as it is added (NFR-11). No copyleft (GPL or AGPL) code
+is copied into this repository, and no dependency is modified.
+
+Generated from the installed tree with `npm ls --all` and the `license` field of each
+`package.json`. Regenerate the summary with:
+
+```bash
+npm ls --all --json > /dev/null   # or inspect node_modules/*/package.json
+```
+
+## Direct dependencies
+
+| Package             | Version | Licence    | Why it is here                             |
+| ------------------- | ------- | ---------- | ------------------------------------------ |
+| `@hono/node-server` | 2.1.4   | MIT        | Local dev server for the relay function    |
+| `dexie`             | 4.4.6   | Apache-2.0 | IndexedDB wrapper for browser-only storage |
+| `hono`              | 4.13.13 | MIT        | The one serverless relay function          |
+| `react`             | 19.3.0  | MIT        | UI                                         |
+| `react-dom`         | 19.3.0  | MIT        | UI                                         |
+| `zod`               | 4.6.7   | MIT        | Schemas and validation for every entity    |
+
+## Direct dev dependencies
+
+| Package                       | Version | Licence    | Why it is here                       |
+| ----------------------------- | ------- | ---------- | ------------------------------------ |
+| `@eslint/js`                  | 9.39.5  | MIT        | ESLint recommended rules             |
+| `@playwright/test`            | 1.64.0  | Apache-2.0 | End-to-end smoke test                |
+| `@testing-library/jest-dom`   | 7.0.1   | MIT        | DOM matchers                         |
+| `@testing-library/react`      | 16.3.3  | MIT        | Rendering React in tests             |
+| `@testing-library/user-event` | 14.6.8  | MIT        | Simulating user input in tests       |
+| `@types/node`                 | 26.6.5  | MIT        | Node types for scripts and the relay |
+| `@types/react`                | 19.3.0  | MIT        | React types                          |
+| `@types/react-dom`            | 19.3.0  | MIT        | React DOM types                      |
+| `@vitejs/plugin-react`        | 6.1.2   | MIT        | React fast refresh in Vite           |
+| `eslint`                      | 9.39.5  | MIT        | Linting                              |
+| `eslint-config-prettier`      | 10.1.8  | MIT        | Keeps ESLint out of formatting       |
+| `eslint-plugin-react-hooks`   | 7.1.1   | MIT        | Hook rules                           |
+| `eslint-plugin-react-refresh` | 0.5.7   | MIT        | Fast refresh rules                   |
+| `fake-indexeddb`              | 6.2.5   | Apache-2.0 | IndexedDB in Node for unit tests     |
+| `globals`                     | 16.5.0  | MIT        | Browser and Node globals for ESLint  |
+| `jsdom`                       | 30.1.2  | MIT        | DOM environment for the UI tests     |
+| `prettier`                    | 3.9.10  | MIT        | Formatting                           |
+| `typescript`                  | 5.9.3   | Apache-2.0 | The language                         |
+| `typescript-eslint`           | 8.71.2  | MIT        | TypeScript rules for ESLint          |
+| `vite`                        | 8.3.4   | MIT        | Dev server and production build      |
+| `vitest`                      | 5.0.4   | MIT        | Unit tests                           |
+
+## Transitive dependency licences
+
+241 packages are installed in total (direct plus transitive). Licence counts:
+
+| Licence      | Packages |
+| ------------ | -------- |
+| MIT          | 190      |
+| Apache-2.0   | 22       |
+| ISC          | 11       |
+| BSD-2-Clause | 8        |
+| BSD-3-Clause | 3        |
+| MIT-0        | 2        |
+| MPL-2.0      | 2        |
+| CC0-1.0      | 1        |
+| CC-BY-4.0    | 1        |
+| Python-2.0   | 1        |
+
+Notes on the non-permissive entries:
+
+- `lightningcss` and `lightningcss-win32-x64-msvc` (MPL-2.0) are pulled in by Vite as a
+  **build-time** CSS transformer. They are used unmodified, are not copied into this
+  repository, and are not distributed as part of the built site. MPL-2.0 is file-level
+  copyleft, so an unmodified dependency does not affect our licence.
+- `caniuse-lite` (CC-BY-4.0) and `argparse` (Python-2.0) are transitive build-time data
+  and utility packages, also unmodified and not redistributed.
+- There is **no GPL or AGPL code anywhere in the dependency tree.**
+
+## Platform components (no dependency, no licence to record)
+
+| Component      | Provided by          | Used for                               |
+| -------------- | -------------------- | -------------------------------------- |
+| Web Crypto     | The browser and Node | SHA-256 hash chain, PBKDF2 PIN hashing |
+| IndexedDB      | The browser          | All ledger storage                     |
+| Service worker | The browser          | Installable PWA app shell              |
+
+## Our own code
+
+All source in `src/`, `scripts/`, `relay/`, `tools/`, `tests/` and `fixtures/` is written by
+the team for this submission. It is unlicensed in this repository (all rights reserved by the
+team) and contains no copied third-party code.
