@@ -7,3 +7,5 @@ blob-report
 package-lock.json
 docs/PRD.md
 evidence
+fixtures/seed
+fixtures/forecast

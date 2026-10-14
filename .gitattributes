@@ -1,0 +1,20 @@
+# Line endings are LF everywhere, on every platform.
+#
+# Without this, a Windows checkout with the default core.autocrlf=true rewrites
+# every text file to CRLF. That turned two gates red that are green on CI:
+#
+#   * `prettier --check` (its endOfLine default is "lf"), and
+#   * src/policy/policy.test.ts, which compares the generated policy PDF
+#     byte-for-byte against the committed fixture.
+#
+# Every blob in this repository is already LF, so this rule changes no content.
+* text=auto eol=lf
+
+# A text-based PDF must never be line-ending converted. The xref table stores
+# byte offsets, so adding a byte to every line corrupts the file: the committed
+# health policy declares startxref 5473, and a CRLF checkout moves it to 5711.
+*.pdf binary
+
+# Generated fixtures are compared as data, not as source, and are rewritten by
+# `npm run seed`. Leave their bytes alone.
+fixtures/** -text

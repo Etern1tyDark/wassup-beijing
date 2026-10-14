@@ -13,3 +13,6 @@ npm-debug.log*
 .env
 .env.*
 !.env.example
+
+# Local agent checkpoint, not part of the product
+CHECKPOINT.md
