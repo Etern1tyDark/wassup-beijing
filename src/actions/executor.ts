@@ -44,6 +44,14 @@ import { evaluateStaleness } from './staleness';
 export const SIMULATED_TRANSFER_CATEGORY = 'simulated-transfer';
 export const SIMULATED_TRANSFER_REVERSAL_CATEGORY = 'simulated-transfer-reversal';
 
+/**
+ * Rows written by one execution share the prefix `txn_<audit entry id>_`, so
+ * an undo can find exactly the rows that execution created.
+ */
+export function transactionIdPrefix(auditEntryId: string): string {
+  return `txn_${auditEntryId}_`;
+}
+
 export interface ExecutionOutcome {
   ok: boolean;
   reason: string | null;
@@ -239,14 +247,6 @@ export function createExecutor(deps: ExecutorDeps): Executor {
       await setEarmarkActive(db, params.earmarkId, true);
       throw error;
     }
-  }
-
-  /**
-   * Rows written by one execution share the prefix `txn_<audit entry id>_`, so
-   * an undo can find exactly the rows that execution created.
-   */
-  function transactionIdPrefix(auditEntryId: string): string {
-    return `txn_${auditEntryId}_`;
   }
 
   async function applyStatementImport(

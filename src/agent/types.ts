@@ -17,7 +17,16 @@ export interface ToolDescriptor {
 }
 
 export type ToolResult =
-  | { ok: true; tool: ActionName; data: unknown }
+  | {
+      ok: true;
+      tool: ActionName;
+      data: unknown;
+      /**
+       * Documents behind this result that carried instruction-like text. Anything
+       * proposed later in the same turn is treated as if that document had set it.
+       */
+      tainted?: Array<{ source: 'document' | 'csv'; ref: string }>;
+    }
   /** `tool` is the name the model asked for, which may not be a registered action. */
   | { ok: false; tool: string; reason: string };
 

@@ -80,7 +80,15 @@ export function extractReviewDate(text: string): string | null {
   return match ? match[1]! : null;
 }
 
-export function extractDays(text: string): number | null {
+const WORD_NUMBERS: Record<string, number> = {
+  one: 1, two: 2, three: 3, four: 4, five: 5, six: 6,
+  seven: 7, eight: 8, nine: 9, ten: 10, eleven: 11, twelve: 12,
+}; // prettier-ignore
+
+export function extractDays(raw: string): number | null {
+  const text = raw.replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve)\b/gi, (word) =>
+    String(WORD_NUMBERS[word.toLowerCase()]),
+  );
   const days = /(\d+)\s*days?\b/i.exec(text);
   if (days) return Number(days[1]);
   const weeks = /(\d+)\s*weeks?\b/i.exec(text);
@@ -101,7 +109,13 @@ export function extractPeriod(text: string): SpendingPeriod | null {
 }
 
 function extractClient(text: string): string | null {
-  const match = /\bclient\s+([a-z]+)\b/i.exec(text);
+  // "Client Bravo", or a capitalised name in "what if Bravo pays late" / "if Bravo is 30 days late".
+  const match =
+    /\bclient\s+([a-z]+)\b/i.exec(text) ??
+    /\b(?:if|when|until)\s+(?!I\b|My\b)([A-Z][a-z]+)\s+(?:pays|paid|is|are|doesn|does|never|only)\b/.exec(
+      text,
+    ) ??
+    /^(?!I\b|My\b|What\b|How\b)([A-Z][a-z]+)\s+(?:pays|is)\b.*\blate\b/.exec(text.trim());
   if (!match) return null;
   const name = match[1]!;
   return `Client ${name[0]!.toUpperCase()}${name.slice(1).toLowerCase()}`;
@@ -238,6 +252,10 @@ type Intent =
   | 'coverage'
   | 'spending'
   | 'summary'
+  | 'accounts'
+  | 'invoices'
+  | 'earmarks'
+  | 'greeting'
   | 'unknown';
 
 export function classify(text: string): Intent {
@@ -256,39 +274,58 @@ export function classify(text: string): Intent {
   if (
     /\b(invest|investing|investment|stocks?|shares|crypto|bitcoin|mutual funds?|reksa ?dana)\b/.test(t) ||
     /\b(which|what)\b.*\b(policy|insurance|insurer|plan)\b.*\b(should|best|better|recommend)\b/.test(t) ||
-    /\b(should i|recommend)\b.*\b(buy|switch|cancel|upgrade)\b.*\b(policy|insurance|plan)\b/.test(t)
+    /\b(should i|recommend|worth)\b.*\b(get|buy|take out|switch|cancel|upgrade|insurance)\b/.test(t) ||
+    /\b(policy|insurance|insurer|plan)\b.*\b(should i (get|buy)|is better|recommend)\b/.test(t) ||
+    /\bwhich (one )?is better\b/.test(t)
   ) {
     return 'advice';
   }
-  if (/\b(undo|revert|roll back)\b/.test(t)) return 'undo';
-  if (/\b(remind|reminder|chase|follow up)\b/.test(t)) return 'reminder';
+  if (/\b(undo|revert|roll back|take (that|it) back|batalkan)\b/.test(t)) return 'undo';
+  if (/\b(remind|reminder|chase|follow up)\b/.test(t) || /\b(draft|write)\b.*\b(client|payment|invoice)\b/.test(t)) return 'reminder'; // prettier-ignore
   if (
     /\b(add|record|log|note)\b.*\b(expense|purchase|transaction|income|payment|spent)\b/.test(t) ||
-    /^i (just )?(spent|paid|bought|received|got paid)\b/.test(t)
+    /^i (just )?(spent|paid|bought|received|got paid)\b/.test(t) ||
+    (/^(record|log|beli|bought)\b/.test(t) && extractAmount(t) !== null)
   ) {
     return 'add-transaction';
   }
-  const setAside = /\b(earmark|set aside|put aside|reserve)\b/.test(t);
-  if (/\b(release|remove|delete|cancel|free up)\b/.test(t) && setAside) return 'release-earmark';
+  const setAside =
+    /\b(earmark|set aside|put aside|reserve|sisihkan)\b/.test(t) ||
+    (/\b(save|put away|keep aside|ring-?fence)\b/.test(t) && extractAmount(t) !== null);
+  if (/\b(earmarks|reserves|set asides?)\b/.test(t) && /\b(what|which|list|show|my)\b/.test(t) && !/\b(release|change|update)\b/.test(t) && extractAmount(t) === null) return 'earmarks'; // prettier-ignore
+  if (/\b(don'?t|no longer) need\b/.test(t) && /\b(money|reserve|fund|earmark)\b/.test(t))
+    return 'release-earmark';
+  if (/\b(release|remove|delete|cancel|free up|don'?t need|no longer need)\b/.test(t) && setAside)
+    return 'release-earmark';
   if (/\b(change|update|edit|increase|decrease|raise|lower|reduce)\b/.test(t) && setAside) {
     return 'update-earmark';
   }
+  // "Pay" alone is not a transfer: "how much would I pay for a hospital bill" is a coverage question.
   if (
     !setAside &&
-    /\b(transfer|wire|send|move|pay)\b/.test(t) &&
+    (/\b(transfer|wire|send|move|kirim)\b/.test(t) || /\bpay\b.*\bto\b/.test(t)) &&
     (extractAmount(t) !== null || /\baccount\b/.test(t)) &&
-    !/\b(late|what if)\b/.test(t)
+    !/\b(late|what if|bill|hospital|cover(ed|age)?|polic(y|ies)|out[- ]of[- ]pocket)\b/.test(t)
   ) {
     return 'transfer';
   }
   if (setAside) return 'earmark';
-  if (/\b(what if|suppose|scenario)\b/.test(t) || /\bpays?\b.*\blate\b/.test(t)) return 'scenario';
-  if (/\bcompar/.test(t)) return 'compare';
-  if (/\b(runway|how long)\b/.test(t)) return 'runway';
-  if (/\b(covers?|covered|coverage|policy|policies|insurance|insurer|out[- ]of[- ]pocket|worst[- ]case|clause|claim)\b/.test(t)) return 'coverage'; // prettier-ignore
-  if (/\b(summary|balances?|safe[- ]to[- ]spend|overview)\b/.test(t)) return 'summary';
-  if (/\b(spend|spent|spending|expenses?)\b/.test(t)) return 'spending';
+  if (/\bcompar|\bdifference between\b|\bboth polic/.test(t)) return 'compare';
+  if (
+    /\b(what if|suppose|scenario|can i afford)\b/.test(t) ||
+    (/\b(pays?|paid)\b/.test(t) && /\blate\b/.test(t)) ||
+    (/\blate\b/.test(t) && extractDays(t) !== null)
+  ) {
+    return 'scenario';
+  }
+  if (/\b(runwa?y|runwya|how long|survive|last me|run out|months? (do i have )?left|berapa lama|bertahan)\b/.test(t)) return 'runway'; // prettier-ignore
+  if (/\b(covers?|covered|coverage|policy|policies|insurance|insurer|out[- ]of[- ]pocket|worst[- ]case|clause|claim|waiting period|exclu\w*|hospital\w*|dental|surgery|physio\w*|asuransi|rawat inap|ditanggung)\b/.test(t)) return 'coverage'; // prettier-ignore
+  if (/\b(invoices?|owes? me|owed|unpaid|outstanding|tagihan)\b/.test(t)) return 'invoices';
+  if (/\b(accounts?|gopay|bca|e-?wallet|wallet|bank|saldo)\b/.test(t) && !/\b(spend|spent)\b/.test(t)) return 'accounts'; // prettier-ignore
+  if (/\b(summary|balances?|safe[- ]to[- ]spend|overview|how am i doing|money do i have|net worth)\b/.test(t)) return 'summary'; // prettier-ignore
+  if (/\b(spend|spent|spending|expenses?|pengeluaran|belanja)\b/.test(t)) return 'spending';
   if (/\b(how much|numbers)\b/.test(t)) return 'summary';
+  if (/^(hi|hello|hey|halo|hai|good (morning|afternoon|evening)|thanks?|thank you|terima kasih|ok(ay)?|cool)\b/.test(t.trim())) return 'greeting'; // prettier-ignore
   return 'unknown';
 }
 
@@ -315,6 +352,23 @@ function proposalOf(observation: Observation): Proposal | null {
   const data = observation.data as { status?: string; proposal?: Proposal } | null;
   return data?.status === 'pending-approval' && data.proposal ? data.proposal : null;
 }
+
+/** Everyday words for the ledger's spending categories. */
+const CATEGORY_WORDS: Record<string, string> = {
+  food: 'groceries',
+  grocery: 'groceries',
+  groceries: 'groceries',
+  rent: 'housing',
+  housing: 'housing',
+  bills: 'utilities',
+  utilities: 'utilities',
+  transport: 'transport',
+  transportation: 'transport',
+  subscriptions: 'subscriptions',
+};
+
+const MONTH_NAME =
+  /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/;
 
 function periodLabel(period: SpendingPeriod): string {
   return {
@@ -368,7 +422,13 @@ class Planner {
       if (pickedOption || classify(text) === 'unknown') text = `${turn.previousUserText} ${text}`;
     }
 
-    return this.route(classify(text), text);
+    // "and 90 days?", "what about dental?", "what about last month?": re-run the
+    // previous tool with the one thing that changed.
+    const intent = classify(text);
+    if (intent === 'unknown' && turn.previousCall && /^(and|what about|how about)\b/i.test(text.trim())) {
+      return this.correction();
+    }
+    return this.route(intent, text);
   }
 
   private route(intent: Intent, text: string): ModelResponse {
@@ -404,7 +464,9 @@ class Planner {
           client: extractClient(text),
           invoiceId: /\binv_[a-z0-9]+\b/i.exec(text)?.[0] ?? null,
           daysLate: /\blate\b/i.test(text) ? extractDays(text) : null,
-          extraExpense: /\b(expense|cost|bill|repair|buy|spend)\b/i.test(text) ? extractAmount(text) : null,
+          extraExpense: /\b(expense|costs?|bill|repairs?|buy|spend|afford|breaks?|need)\b/i.test(text)
+            ? extractAmount(text)
+            : null,
           mentionsLate: /\blate\b/i.test(text),
         });
       case 'compare':
@@ -412,11 +474,19 @@ class Planner {
       case 'runway':
         return this.runway();
       case 'coverage':
-        return this.coverage(text);
+        return this.coverage(text.replace(/\brawat inap\b/gi, 'hospital stay'));
       case 'spending':
-        return this.spending(extractPeriod(text) ?? 'this-month');
+        return this.spending(extractPeriod(text) ?? 'this-month', text);
       case 'summary':
         return this.summary();
+      case 'accounts':
+      case 'invoices':
+      case 'earmarks':
+        return this.summary(intent);
+      case 'greeting':
+        return say(
+          /\b(thank|terima)/i.test(text) ? `You’re welcome. ${CAPABILITIES}` : `Hi! ${CAPABILITIES}`,
+        );
       case 'unknown':
         return say(CAPABILITIES);
     }
@@ -448,11 +518,35 @@ class Planner {
 
   /* -------------------------------------------------------------- reads */
 
-  private summary(): ModelResponse {
+  private summary(focus?: 'accounts' | 'invoices' | 'earmarks'): ModelResponse {
     const observation = this.seen('get_summary');
     if (!observation) return call('Let me pull your numbers.', { name: 'get_summary', arguments: {} });
     if (observation.error) return say(`I could not read the ledger: ${observation.error}`);
     const data = observation.data as SummaryData;
+    if (focus === 'accounts') {
+      const lines = data.accounts.map((account) => `${account.name} ${rp(account.balance)}`).join(', ');
+      return say(
+        `Your accounts as of ${data.asOf}: ${lines}. Free cash after earmarks is ${rp(data.freeCash)}.`,
+      );
+    }
+    if (focus === 'invoices') {
+      if (data.openInvoices.length === 0)
+        return say('No client owes you money right now: every invoice is paid.');
+      const lines = data.openInvoices
+        .map(
+          (invoice) =>
+            `${invoice.client} ${rp(invoice.amount)} (${invoice.id}, ${invoice.daysOverdue > 0 ? `${invoice.daysOverdue} days overdue` : `due ${invoice.dueDate}`})`,
+        )
+        .join('; ');
+      return say(`Open invoices: ${lines}. I can draft a reminder or test what happens if one pays late.`);
+    }
+    if (focus === 'earmarks') {
+      if (data.activeEarmarks.length === 0) return say('You have no money set aside right now.');
+      const lines = data.activeEarmarks
+        .map((earmark) => `${earmark.label} ${rp(earmark.amount)} (review ${earmark.reviewDate})`)
+        .join('; ');
+      return say(`Set aside: ${lines}. I can change or release any of them, with your approval.`);
+    }
     return say(
       `Safe to spend is ${rp(data.safeToSpend)} as of ${data.asOf}. Your total balance is ${rp(data.totalBalance)}, free cash is ${rp(data.freeCash)}, and ${rp(data.obligationsDueIn30Days)} of obligations fall due soon.` +
         (data.dataIsStale ? ' Your data is stale; import a fresh statement before acting on it.' : ''),
@@ -477,7 +571,7 @@ class Planner {
     );
   }
 
-  private spending(period: SpendingPeriod): ModelResponse {
+  private spending(period: SpendingPeriod, text = ''): ModelResponse {
     const observation = this.seen('get_spending');
     if (!observation) {
       return call('Let me add that up.', { name: 'get_spending', arguments: { period } });
@@ -485,10 +579,31 @@ class Planner {
     if (observation.error) return say(observation.error);
     const data = observation.data as SpendingData;
     const top = data.byCategory[0];
+    const lower = text.toLowerCase();
+    const askedFor = Object.entries(CATEGORY_WORDS).find(([word]) =>
+      new RegExp(`\\b${word}\\b`).test(lower),
+    )?.[1];
+    const category = data.byCategory.find(
+      (entry) => entry.category === askedFor || new RegExp(`\\b${entry.category}\\b`).test(lower),
+    );
+    const month = MONTH_NAME.exec(lower)?.[1];
+    const monthNote =
+      month && !extractPeriod(text)
+        ? ` I can total this month, last month, or the last thirty or ninety days, so this is ${periodLabel(data.period)}; ask for "last month" if you meant that.`
+        : '';
+    if (category) {
+      return say(
+        this.lead(
+          `In ${periodLabel(data.period)} (${data.from} to ${data.to}) you spent ${rp(category.total)} on ${category.category}, out of ${rp(data.moneyOut)} in total.${monthNote}`,
+        ),
+      );
+    }
     return say(
       this.lead(
         `In ${periodLabel(data.period)} (${data.from} to ${data.to}) you spent ${rp(data.moneyOut)} and received ${rp(data.moneyIn)}.` +
-          (top ? ` The largest category was ${top.category} at ${rp(top.total)}.` : ''),
+          (top ? ` The largest category was ${top.category} at ${rp(top.total)}.` : '') +
+          (askedFor ? ` I found no ${askedFor} spending in that period.` : '') +
+          monthNote,
       ),
     );
   }

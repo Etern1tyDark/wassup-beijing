@@ -269,6 +269,19 @@ function summarisePolicy(loaded: LoadedPolicy): PolicySummary {
   };
 }
 
+/** The policies among these that hide instruction-like text (ST2). */
+function taintedPolicies(policies: readonly LoadedPolicy[]): Array<{ source: 'document'; ref: string }> {
+  return policies
+    .filter((loaded) => loaded.document.clauses.some((clause) => clause.injectionSignals.length > 0))
+    .map((loaded) => ({ source: 'document' as const, ref: loaded.policy.id }));
+}
+
+/** Attach the taint of the policies a result was built from, when there is any. */
+function withTaint<T extends ToolResult>(result: T, policies: readonly LoadedPolicy[]): T {
+  const tainted = taintedPolicies(policies);
+  return result.ok && tainted.length > 0 ? { ...result, tainted } : result;
+}
+
 /** Find a policy by id, by type ("health") or by a word from its name. */
 function resolvePolicy(
   policies: readonly LoadedPolicy[],
@@ -510,7 +523,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
   register('list_policies', {}, async () => {
     const policies = await deps.policies.all();
     const data: PolicySummary[] = policies.map(summarisePolicy);
-    return { ok: true, tool: 'list_policies', data };
+    return withTaint({ ok: true, tool: 'list_policies', data }, policies);
   });
 
   register(
@@ -544,7 +557,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
         freeCash: snapshot.freeCash,
         asOf: snapshot.asOf,
       });
-      return { ok: true, tool: 'get_coverage', data };
+      return withTaint({ ok: true, tool: 'get_coverage', data }, [resolved.policy]);
     },
   );
 
@@ -579,7 +592,7 @@ export function createAgentTools(deps: AgentToolDeps): AgentTools {
       chosen.map((entry) => ({ policy: entry.policy, items: entry.items })),
       criteria,
     );
-    return { ok: true, tool: 'compare_policies', data };
+    return withTaint({ ok: true, tool: 'compare_policies', data }, chosen);
   });
 
   register('draft_reminder', { invoiceId: 'string?', tone: REMINDER_TONES.join(' | ') }, async (args) => {

@@ -7,7 +7,7 @@ Generated from the installed tree with `npm ls --all` and the `license` field of
 `package.json`. Regenerate the summary with:
 
 ```bash
-npm ls --all --json > /dev/null   # or inspect node_modules/*/package.json
+npm ls --all --json > licences.json   # or inspect node_modules/*/package.json
 ```
 
 ## Direct dependencies

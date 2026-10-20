@@ -75,3 +75,55 @@ function constantTimeEqual(a: string, b: string): boolean {
   }
   return difference === 0;
 }
+
+/** Wrong PINs allowed before the PIN is locked for a while. */
+export const PIN_FREE_ATTEMPTS = 5;
+const PIN_BASE_LOCK_MS = 30_000;
+const PIN_MAX_LOCK_MS = 15 * 60_000;
+
+export type PinCheck = { ok: true } | { ok: false; reason: string; failures: number; locked: boolean };
+
+export interface PinGuard {
+  check(pin: string | undefined, stored: string, now?: number): Promise<PinCheck>;
+}
+
+/**
+ * Online guessing limit for the app PIN: after five wrong PINs in a row the PIN
+ * is locked for 30 seconds, doubling with each further miss up to 15 minutes.
+ * One guard per database, so the settings screen and the T3 step-up share the
+ * count. It lives in memory: a reload resets it, and the stored hash can still
+ * be attacked offline by someone with the device (SECURITY.md, known risks).
+ */
+export function createPinGuard(): PinGuard {
+  let failures = 0;
+  let lockedUntil = 0;
+  return {
+    check: async (pin, stored, now = Date.now()) => {
+      if (now < lockedUntil) {
+        const seconds = Math.ceil((lockedUntil - now) / 1000);
+        return { ok: false, reason: `PIN locked after ${failures} wrong attempts; try again in ${seconds} s`, failures, locked: true }; // prettier-ignore
+      }
+      if (pin !== undefined && pin !== '' && (await verifyPin(pin, stored))) {
+        failures = 0;
+        return { ok: true };
+      }
+      failures += 1;
+      if (failures >= PIN_FREE_ATTEMPTS) {
+        lockedUntil = now + Math.min(PIN_MAX_LOCK_MS, PIN_BASE_LOCK_MS * 2 ** (failures - PIN_FREE_ATTEMPTS));
+      }
+      return { ok: false, reason: 'wrong PIN', failures, locked: failures >= PIN_FREE_ATTEMPTS };
+    },
+  };
+}
+
+const guards = new WeakMap<object, PinGuard>();
+
+/** The guard shared by everything that checks the PIN against one database. */
+export function pinGuardFor(owner: object): PinGuard {
+  let guard = guards.get(owner);
+  if (!guard) {
+    guard = createPinGuard();
+    guards.set(owner, guard);
+  }
+  return guard;
+}

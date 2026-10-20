@@ -34,11 +34,61 @@ export const PLACEHOLDERS: Record<RedactionKind, string> = {
 };
 
 const EMAIL = /[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g;
-const NIK = /\b\d{16}\b/g;
-/** Indonesian mobile numbers, with or without the country code. */
-const PHONE = /(?:\+62|62|0)8\d{7,12}\b/g;
+/** Payment card numbers, grouped or not; only runs that pass the Luhn check count. */
+const CARD = /\b\d{4}[ -]?\d{4}[ -]?\d{4}[ -]?\d{4}\b/g;
+/** NPWP (tax number), as printed: 99.999.999.9-999.999. */
+const NPWP = /\b\d{2}\.\d{3}\.\d{3}\.\d-\d{3}\.\d{3}\b/g;
+/** NIK, also when written in groups: 3171 0123 4567 8901 or 31.71.01-234567-8901. */
+const NIK =
+  /\b\d{16}\b|\b\d{2}[ .-]?\d{2}[ .-]?\d{2}[ .-]?\d{6}[ .-]?\d{4}\b|\b\d{4}[ .-]\d{4}[ .-]\d{4}[ .-]\d{4}\b/g;
+/**
+ * Indonesian mobile numbers, with or without the country code and with any of
+ * the usual separators: 0812-3456-7890, +62 812 3456 7890, (+62) 812.3456.7890.
+ */
+const PHONE = /(?<![\d.,])(?:\(?\+?62\)?|0)[ .-]?8\d{1,3}(?:[ .-]?\d{2,4}){2,3}\b/g;
+/** Landlines with an area code in brackets: (021) 555-1234. */
+const LANDLINE = /\(0\d{1,3}\)[ .-]?\d{3,4}[ .-]?\d{3,4}\b/g;
 /** Account-like digit runs. 16-digit NIK and phone numbers are matched first. */
 const ACCOUNT_LIKE = /\b\d{10,15}\b/g;
+/** Account numbers written in groups: 123-456-7890, 1234 5678 90. */
+const GROUPED_DIGITS = /\b\d{3,6}(?:[ -]\d{2,6}){1,4}\b/g;
+
+/** Zero-width and other invisible format characters that can split an identifier. */
+const INVISIBLE = /[\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
+/**
+ * Fold full-width digits and letters to ASCII and drop invisible characters, so
+ * "０８１２" and "ri\u200Bna@mail.com" cannot slip past the patterns below.
+ */
+export function normaliseForRedaction(input: string): string {
+  return input
+    .normalize('NFKC')
+    .replace(INVISIBLE, '')
+    .replace(/\u00A0/g, ' ');
+}
+
+function luhn(digits: string): boolean {
+  let sum = 0;
+  for (let index = 0; index < digits.length; index += 1) {
+    let digit = Number(digits[digits.length - 1 - index]);
+    if (index % 2 === 1) {
+      digit *= 2;
+      if (digit > 9) digit -= 9;
+    }
+    sum += digit;
+  }
+  return sum % 10 === 0;
+}
+
+/** A pattern for a known value that tolerates any case and any run of spaces, dots or dashes. */
+function looseLiteral(value: string): RegExp {
+  const parts = value
+    .trim()
+    .split(/[\s.-]+/)
+    .filter(Boolean)
+    .map(escapeRegExp);
+  return new RegExp(`(?<![\\w])${parts.join('[\\s.-]*')}(?![\\w])`, 'gi');
+}
 
 function escapeRegExp(value: string): string {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -65,14 +115,21 @@ function collect(redactions: Redaction[], kind: RedactionKind, value: string): v
  */
 export function redactText(input: string, config: RedactorConfig): { text: string; redactions: Redaction[] } {
   const redactions: Redaction[] = [];
-  let text = input;
+  let text = normaliseForRedaction(input);
 
-  const apply = (pattern: RegExp, kind: RedactionKind, replace: (match: string) => string): void => {
+  const apply = (
+    pattern: RegExp,
+    kind: RedactionKind,
+    replace: (match: string) => string,
+    accept: (match: string) => boolean = () => true,
+  ): void => {
     text = text.replace(pattern, (match) => {
+      if (!accept(match)) return match;
       collect(redactions, kind, match);
       return replace(match);
     });
   };
+  const digitsOf = (match: string): string => match.replace(/\D/g, '');
 
   apply(EMAIL, 'email', () => PLACEHOLDERS.email);
 
@@ -85,31 +142,46 @@ export function redactText(input: string, config: RedactorConfig): { text: strin
   }
 
   for (const accountNumber of config.accountNumbers) {
-    if (accountNumber.length === 0) continue;
-    apply(
-      new RegExp(`\\b${escapeRegExp(accountNumber)}\\b`, 'g'),
-      'account-number',
-      () => PLACEHOLDERS['account-number'],
-    );
+    if (accountNumber.trim().length === 0) continue;
+    apply(looseLiteral(accountNumber), 'account-number', () => PLACEHOLDERS['account-number']);
   }
 
   for (const policyNumber of config.policyNumbers) {
-    if (policyNumber.length === 0) continue;
-    apply(
-      new RegExp(`\\b${escapeRegExp(policyNumber)}\\b`, 'g'),
-      'policy-number',
-      () => PLACEHOLDERS['policy-number'],
-    );
+    if (policyNumber.trim().length === 0) continue;
+    apply(looseLiteral(policyNumber), 'policy-number', () => PLACEHOLDERS['policy-number']);
   }
 
+  // A card number is not a NIK, though both have 16 digits: the Luhn check tells them apart.
+  apply(
+    CARD,
+    'account-number',
+    () => PLACEHOLDERS['account-number'],
+    (match) => luhn(digitsOf(match)),
+  );
+  apply(NPWP, 'nik', () => PLACEHOLDERS.nik);
   apply(NIK, 'nik', () => PLACEHOLDERS.nik);
-  apply(PHONE, 'phone', () => PLACEHOLDERS.phone);
+  apply(
+    PHONE,
+    'phone',
+    () => PLACEHOLDERS.phone,
+    (match) => digitsOf(match).length >= 9,
+  );
+  apply(LANDLINE, 'phone', () => PLACEHOLDERS.phone);
   apply(ACCOUNT_LIKE, 'account-number', () => PLACEHOLDERS['account-number']);
+  apply(
+    GROUPED_DIGITS,
+    'account-number',
+    () => PLACEHOLDERS['account-number'],
+    (match) => {
+      const length = digitsOf(match).length;
+      return length >= 10 && length <= 16;
+    },
+  );
 
   for (const name of config.names) {
     const trimmed = name.trim();
     if (trimmed.length < 2) continue;
-    apply(new RegExp(`\\b${escapeRegExp(trimmed)}\\b`, 'gi'), 'name', () => PLACEHOLDERS.name);
+    apply(looseLiteral(trimmed), 'name', () => PLACEHOLDERS.name);
   }
 
   return { text, redactions };

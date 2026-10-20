@@ -41,7 +41,7 @@ model / UI form / chat
         ├─ 3. param schema             invalid params  → refused, logged
         ├─ 4. provenance               untrusted text setting action/amount/
         │                              target account  → refused, logged      (PRD §6)
-        ├─ 5. feature flag             T3 with SIM_T3 off → refused, logged   (ACT-4)
+        ├─ 5. feature flag             T3 with simT3 off → refused, logged   (ACT-4)
         ├─ 6. guardrails               any rule fails  → refused, logged      (ACT-5)
         ├─ 7. approval queue           5 already waiting → refused, logged
         ▼

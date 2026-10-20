@@ -19,9 +19,9 @@ interface CliResult {
   stderr: string;
 }
 
-async function verify(file: string): Promise<CliResult> {
+async function verify(file: string, ...extra: string[]): Promise<CliResult> {
   try {
-    const { stdout, stderr } = await run(process.execPath, [cliPath, file], { cwd: process.cwd() });
+    const { stdout, stderr } = await run(process.execPath, [cliPath, file, ...extra], { cwd: process.cwd() });
     return { code: 0, stdout, stderr };
   } catch (error) {
     const failure = error as { code?: number; stdout?: string; stderr?: string };
@@ -89,6 +89,33 @@ describe('npm run verify:audit (AUD-3)', () => {
     const result = await verify(bad);
     expect(result.code).toBe(2);
     expect(result.stderr).toMatch(/expected an array of entries/);
+  });
+
+  it('fails on an empty log, which proves nothing', async () => {
+    const empty = join(directory, 'audit-empty.json');
+    writeFileSync(empty, JSON.stringify([]));
+    const result = await verify(empty);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/empty/);
+  });
+
+  it('fails when entries were cut from the end of an export', async () => {
+    const exported = JSON.parse(readFileSync(goodFile, 'utf8')) as { entries: unknown[] };
+    exported.entries.pop();
+    const truncated = join(directory, 'audit-truncated.json');
+    writeFileSync(truncated, JSON.stringify(exported));
+    const result = await verify(truncated);
+    expect(result.code).toBe(1);
+    expect(result.stderr).toMatch(/says 3 entries but contains 2/);
+  });
+
+  it('checks the head hash against one recorded elsewhere', async () => {
+    const ok = await verify(goodFile);
+    const head = /head hash (\S+)/.exec(ok.stdout)![1]!;
+    expect((await verify(goodFile, '--expected-head', head)).code).toBe(0);
+    const rewritten = await verify(goodFile, '--expected-head', 'f'.repeat(64));
+    expect(rewritten.code).toBe(1);
+    expect(rewritten.stderr).toMatch(/does not match the expected/);
   });
 
   it('fails on a missing file', async () => {

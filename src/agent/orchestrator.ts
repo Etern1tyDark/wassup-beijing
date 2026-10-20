@@ -125,6 +125,12 @@ export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
   const maxToolRounds = deps.maxToolRounds ?? 6;
   let history: ModelMessage[] = [];
   let turn = 0;
+  /**
+   * Turns that carried untrusted text. Their text stays in the history the model
+   * reads, so a later "yes, do it" must not launder it: every later proposal
+   * carries their taint until the chat is cleared.
+   */
+  let taintedTurns: string[] = [];
 
   /** A tool that throws (a closed database, a bug) becomes a tool error, not a crash. */
   async function invokeSafely(name: string, args: unknown, context: ToolContext): Promise<ToolResult> {
@@ -139,6 +145,7 @@ export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
     reset: () => {
       history = [];
       turn = 0;
+      taintedTurns = [];
     },
 
     send: async (userMessage, context = {}): Promise<TurnResult> => {
@@ -152,11 +159,14 @@ export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
           ...(context.untrustedInputs ?? []),
           // Anything proposed in a turn that carried untrusted text is treated
           // as if that text had set the action and its protected parameters.
-          ...(user.untrusted
-            ? [{ source: 'chat' as const, ref: turnId, fields: ['action', ...PROTECTED_PARAM_PATHS] }]
-            : []),
+          ...[...taintedTurns, ...(user.untrusted ? [turnId] : [])].map((ref) => ({
+            source: 'chat' as const,
+            ref,
+            fields: ['action', ...PROTECTED_PARAM_PATHS],
+          })),
         ],
       };
+      if (user.untrusted) taintedTurns.push(turnId);
 
       if (user.untrusted) {
         await deps.onUntrustedTurn?.({
@@ -195,6 +205,10 @@ export function createOrchestrator(deps: OrchestratorDeps): AgentOrchestrator {
         for (const call of fresh) {
           const result = await invokeSafely(call.name, call.arguments, toolContext);
           toolResults.push(result);
+          // A tool result built from a tampered document taints the rest of the turn.
+          for (const source of result.ok ? (result.tainted ?? []) : []) {
+            toolContext.untrustedInputs!.push({ ...source, fields: ['action', ...PROTECTED_PARAM_PATHS] });
+          }
           history.push({
             role: 'tool',
             name: call.name,

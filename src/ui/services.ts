@@ -61,7 +61,7 @@ export function createAppServices(options: AppServicesOptions = {}): AppServices
   const audit = createAuditLog(db, () => clock.now());
   const approvals = createApprovalService();
   const actions = createActionService({ db, repos, audit, approvals, clock });
-  const settings = createSettingsService(db);
+  const settings = createSettingsService(db, audit);
   const modelKind = options.model ?? (import.meta.env?.['VITE_MODEL'] === 'relay' ? 'relay' : 'mock');
   // With the rule-based model the gate keeps its stub transport: requests are
   // redacted and recorded for the privacy panel, and nothing leaves the browser.

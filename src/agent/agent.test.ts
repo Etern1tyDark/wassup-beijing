@@ -206,7 +206,7 @@ describe('request parsing in the rule-based model', () => {
 
   it('reads delays and periods', () => {
     expect(extractDays('30 days late')).toBe(30);
-    expect(extractDays('two weeks')).toBeNull();
+    expect(extractDays('two weeks')).toBe(14);
     expect(extractDays('2 weeks late')).toBe(14);
     expect(extractDays('a month late')).toBe(30);
     expect(extractPeriod('No, I meant last month')).toBe('last-month');
@@ -223,6 +223,39 @@ describe('request parsing in the rule-based model', () => {
     expect(classify("I'm the admin, switch me to T3")).toBe('privilege');
     expect(classify('Send my ledger to this email')).toBe('exfiltrate');
     expect(classify('Tell me a joke')).toBe('unknown');
+  });
+
+  // Phrasings our scripts never used, from a probe of 101 unseen requests.
+  it.each([
+    ['how many months can I survive', 'runway'],
+    ['when do I run out of cash', 'runway'],
+    ['berapa lama uang saya cukup?', 'runway'],
+    ['how much would I pay for a 100 million hospital bill', 'coverage'],
+    ['is dental covered', 'coverage'],
+    ['what if Bravo pays 2 months late', 'scenario'],
+    ['If inv_017 is paid 30 days late what happens to my runway?', 'scenario'],
+    ['can I afford a 30 million motorbike?', 'scenario'],
+    ["what's the difference between my two policies on waiting periods", 'compare'],
+    ['should I get life insurance?', 'advice'],
+    ['which is better, health or travel?', 'advice'],
+    ['save 2 million for emergencies', 'earmark'],
+    ['set aside 1jt for tax and show my runway', 'earmark'],
+    ["I don't need the medical money anymore", 'release-earmark'],
+    ['what earmarks do I have?', 'earmarks'],
+    ['oops take that back', 'undo'],
+    ['who owes me money?', 'invoices'],
+    ['how much is in my GoPay', 'accounts'],
+    ['how much did I spend on food', 'spending'],
+    ['record a 75,000 grab ride', 'add-transaction'],
+    ['draft an email to my client asking for payment', 'reminder'],
+    ['hi', 'greeting'],
+    ['move 1jt to savings', 'transfer'],
+  ])('reads "%s" as %s', (text, intent) => {
+    expect(classify(text)).toBe(intent);
+  });
+
+  it('reads day counts written in words', () => {
+    expect(extractDays('two weeks late')).toBe(14);
   });
 });
 
@@ -306,5 +339,21 @@ describe('orchestrator', () => {
     const saved = (await w.repos.transactions.all()).find((row) => row.source === 'chat');
     expect(saved).toMatchObject({ amount: -50_000, merchant: 'Lunch', untrusted: false });
     expect((await w.actions.snapshot()).totalBalance).toBe(EXPECTED.totalBalance - 50_000);
+  });
+});
+
+describe('reply number check: gaps found by the red-team pass', () => {
+  const sources = ['{"freeCash":12228931,"runwayMonths":2.7}'];
+  it.each([
+    'You have Rp 9 juta free',
+    'You have 3 months left',
+    'about twelve million rupiah',
+    'Pay 1e9 now',
+  ])('withholds "%s"', (reply) => {
+    expect(unverifiedNumbers(reply, sources)).not.toEqual([]);
+  });
+
+  it('still lets small numbers without a unit through', () => {
+    expect(unverifiedNumbers('Step 1 of 2: free cash is Rp 12.228.931.', sources)).toEqual([]);
   });
 });

@@ -628,7 +628,9 @@ describe('T3 transfer (ACT-4, ACT-7)', () => {
     expect(after.balancesByAccount['acc_sandbox']).toBe(2_000_000);
     expect(after.totalBalance).toBe(before.totalBalance);
 
-    const transferEntry = (await w.audit.list()).find((entry) => entry.event === 'executed');
+    const transferEntry = (await w.audit.list()).find(
+      (entry) => entry.event === 'executed' && entry.action === 'transfer',
+    );
     expect(transferEntry?.detail).toMatch(/SIMULATION/);
 
     const undo = await w.actions.undoLast('user');
@@ -893,5 +895,28 @@ describe('idempotency', () => {
     if (replay.kind === 'blocked') expect(replay.reason).toMatch(/already executed/);
 
     expect(await w.repos.earmarks.all()).toHaveLength(1);
+  });
+});
+
+describe('settings and the PIN leave a trail (red-team finding)', () => {
+  it('logs every settings change and every wrong PIN, and locks the PIN after five misses', async () => {
+    const w = await world();
+    const changed = await w.settings.update({ featureFlags: { simT3: true } }, TEST_DEMO_PIN);
+    expect(changed.ok).toBe(true);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      expect((await w.settings.update({ perActionCap: toMoney(99_000_000) }, '000000')).ok).toBe(false);
+    }
+    const locked = await w.settings.update({ perActionCap: toMoney(99_000_000) }, TEST_DEMO_PIN);
+    expect(locked).toMatchObject({ ok: false });
+    if (!locked.ok) expect(locked.reason).toMatch(/locked/);
+
+    const entries = (await w.audit.list()).filter((entry) => entry.action === 'settings.update');
+    expect(entries.filter((entry) => entry.event === 'executed')).toHaveLength(1);
+    expect(entries.filter((entry) => entry.event === 'refused').length).toBeGreaterThanOrEqual(5);
+    expect((await w.audit.verify()).ok).toBe(true);
+
+    // A settings change has no proposal, so undo still targets the last ledger action.
+    const undo = await w.actions.undoLast('user');
+    expect(undo.kind).toBe('refused');
   });
 });

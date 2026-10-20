@@ -93,11 +93,23 @@ function ReminderCard({ data }: { data: ReminderData }) {
   );
 }
 
+/** A refusal in plain words: no "refused:" prefix, no requirement IDs. Both stay in the audit log. */
+function plainRefusal(reason: string): string {
+  const text = reason
+    .replace(/^refused(?: by guardrails)?:\s*/i, '')
+    .replace(/\s*\((?:[A-Z]{2,5}-\d+(?:,\s*)?)+\)/g, '')
+    .trim();
+  return text.length > 0 ? `${text[0]!.toUpperCase()}${text.slice(1)}` : reason;
+}
+
 function ToolCard({ result }: { result: ToolResult }) {
   if (!result.ok) {
     return (
-      <div className="tool-card refused" data-testid="card-refused">
-        <strong>Not done</strong> · {result.tool}: {result.reason}
+      <div className="tool-card refused" data-testid="card-refused" role="status">
+        <strong>
+          <span aria-hidden="true">🔒 </span>Refused · logged
+        </strong>{' '}
+        {plainRefusal(result.reason)}
       </div>
     );
   }
@@ -107,7 +119,7 @@ function ToolCard({ result }: { result: ToolResult }) {
     return (
       <div className="tool-card" data-testid="card-proposal">
         <strong>Waiting for your approval</strong> · {proposal.action} ({proposal.tier}). Nothing has changed.
-        The approval card with the before and after is under “Approvals”.
+        The <a href="#approvals">approval card</a> shows the before and after.
       </div>
     );
   }

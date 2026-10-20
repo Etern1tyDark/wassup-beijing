@@ -1,14 +1,22 @@
-import { useCallback, useContext, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent } from 'react';
 import { formatRupiah, parseRupiah, toMoney } from '../domain/money';
 import { SeedDatasetSchema } from '../domain/seed';
 import { loadSeedData } from '../storage/bootstrap';
-import type { Earmark, OutboundRequest, Proposal, ProposalDiff, Settings } from '../domain/schemas';
+import type {
+  AuditEntry,
+  Earmark,
+  OutboundRequest,
+  Proposal,
+  ProposalDiff,
+  Settings,
+} from '../domain/schemas';
 import type { LedgerSnapshot } from '../ledger/engine';
 import type { StalenessReport } from '../actions/staleness';
 import { useServices } from './services-context';
 import { useAppStateContext } from './app-state-context';
 import { formatTimestamp, shortHash } from './app-state';
 import { groupByRisk } from '../actions/risk';
+import { looksLikeInjection } from '../importers/injection';
 import { ChatPanel } from './ChatPanel';
 import { LanguageContext, useT } from './i18n';
 import { PolicyPanel, RunwayPanel, StatementImportPanel } from './DashboardPanels';
@@ -51,7 +59,11 @@ function DiffTable({ diff }: { diff: ProposalDiff }) {
 }
 
 /** One plain sentence saying what approving the card will do. */
-function describeProposal(proposal: Proposal, accountNames: Record<string, string>): string {
+function describeProposal(
+  proposal: Proposal,
+  accountNames: Record<string, string>,
+  audit: readonly AuditEntry[] = [],
+): string {
   const params = proposal.params;
   const amount = typeof params['amount'] === 'number' ? formatRupiah(toMoney(params['amount'])) : '';
   const account = (id: unknown): string => (typeof id === 'string' ? (accountNames[id] ?? id) : '');
@@ -80,14 +92,37 @@ function describeProposal(proposal: Proposal, accountNames: Record<string, strin
       return `Add “${String(params['merchant'])}”, ${amount} on ${String(params['date'])}, to ${account(params['accountId'])}.`;
     case 'transfer':
       return `Simulate moving ${amount} from ${account(params['fromAccountId'])} to ${account(params['toAccountId'])}.`;
-    case 'undo':
-      return 'Reverse the action named below. The original entry stays in the audit log.';
+    case 'undo': {
+      const original = audit.find((entry) => entry.id === params['auditEntryId']);
+      const what = original
+        ? `“${original.detail}” (${original.action ?? 'action'})`
+        : 'the action named below';
+      return `Reverse ${what}. The original entry stays in the audit log.`;
+    }
     default:
       return proposal.action;
   }
 }
 
 /* ----------------------------------------------------------- approval card */
+
+/** Cards present when the page first renders are not "new", so they do not pull the page around. */
+const PAGE_LOADED_AT = Date.now();
+
+/**
+ * A card made from the chat is added above it, out of view. Bring it into view
+ * and move focus to it, so the before-and-after is what the user reads next.
+ */
+function useRevealWhenNew<T extends HTMLElement>() {
+  const ref = useRef<T>(null);
+  useEffect(() => {
+    if (Date.now() - PAGE_LOADED_AT < 1500) return;
+    const element = ref.current;
+    element?.scrollIntoView?.({ behavior: 'smooth', block: 'center' });
+    element?.focus?.({ preventScroll: true });
+  }, []);
+  return ref;
+}
 
 function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: () => void }) {
   const t = useT();
@@ -97,6 +132,13 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
   const [pin, setPin] = useState('');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const cardRef = useRevealWhenNew<HTMLElement>();
+  const flaggedRows =
+    proposal.action === 'statement.import' && Array.isArray(proposal.params['rows'])
+      ? (proposal.params['rows'] as Array<{ line: number; description: string }>).filter((row) =>
+          looksLikeInjection(row.description),
+        )
+      : [];
 
   useEffect(() => {
     let cancelled = false;
@@ -144,7 +186,7 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
   );
 
   return (
-    <article className="card approval" data-testid="approval-card">
+    <article className="card approval" data-testid="approval-card" ref={cardRef} tabIndex={-1}>
       <header className="card-header">
         <h3>
           {t('approval.needed')} · {proposal.action}{' '}
@@ -153,7 +195,15 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
         {proposal.tier === 'T3' ? <p className="simulation-label">SIMULATION - no real money moves</p> : null}
       </header>
 
-      <p data-testid="approval-summary">{describeProposal(proposal, state.accountNames)}</p>
+      <p data-testid="approval-summary">{describeProposal(proposal, state.accountNames, state.audit)}</p>
+
+      {flaggedRows.length > 0 ? (
+        <p className="warning" role="alert" data-testid="approval-untrusted">
+          Line {flaggedRows.map((row) => row.line).join(', ')} of this file reads like an instruction (“
+          {flaggedRows[0]!.description}”). It will be stored as text only and cannot change this action, the
+          amount or the account. Read the rows before you approve.
+        </p>
+      ) : null}
 
       <DiffTable diff={proposal.diff} />
 
@@ -297,7 +347,7 @@ function LowRiskGroupCard({ proposals, onChanged }: { proposals: Proposal[]; onC
         <tbody>
           {proposals.map((proposal) => (
             <tr key={proposal.proposalId} data-testid="approval-group-item">
-              <td>{describeProposal(proposal, state.accountNames)}</td>
+              <td>{describeProposal(proposal, state.accountNames, state.audit)}</td>
               <td>{moneyDelta(proposal.diff.safeToSpend)}</td>
             </tr>
           ))}
@@ -950,7 +1000,7 @@ export function App() {
 
             <div className="column">
               {/* Approvals sit above the chat, so a new card is never below the fold. */}
-              <section data-testid="approvals" aria-label="Approvals">
+              <section id="approvals" data-testid="approvals" aria-label="Approvals">
                 {state.pending.length > 0 ? (
                   <div className="pending" data-testid="pending-list">
                     {pendingGroups.individual.map((proposal) => (

@@ -39,7 +39,7 @@ Six actions after the seed is loaded (PRD Section 3, check I4):
 
 1. **Sample statement** in "Import a statement" reads a three-row CSV. Nothing is in the ledger
    yet: an approval card shows the rows, the net effect and the guardrails.
-2. **Approve** it. The balance changes and the audit log gains three entries.
+2. **Approve** it. The balance changes and the audit log gains two entries (approved, executed); the third, proposed, was written when the card appeared.
 3. **Sample health policy** in "Policy coverage" reads a two-page PDF with pdf.js, in the
    browser. The panel shows the limit, the co-payment, the worst case for a hospital stay, the
    shortfall against free cash, and the clause each number came from.
@@ -98,7 +98,7 @@ person and every figure are invented.
 | `npm run verify:audit -- <file>` | Verify an exported audit log                                            |
 | `npm run relay:dev`              | Run the relay locally (needs `MODEL_API_KEY`)                           |
 
-Run the same checks CI runs:
+Run the same checks CI runs (the first `e2e` run needs a browser: `npx playwright install chromium`):
 
 ```bash
 npm run format:check && npm run lint && npm run lint:boundary && npm run typecheck && npm test && npm run build && npm run e2e
@@ -106,7 +106,7 @@ npm run format:check && npm run lint && npm run lint:boundary && npm run typeche
 
 ## Tests
 
-322 unit, integration, acceptance and UI tests, plus three end-to-end tests in a real browser.
+386 unit, integration, acceptance and UI tests, plus three end-to-end tests in a real browser.
 
 The acceptance scripts in PRD Section 12 are tests with the same names:
 `src/acceptance/scripts.test.ts` runs S1 to S8, I1 to I3 and ST1 to ST8 against the whole
@@ -126,6 +126,8 @@ rule-based model), and `tests/e2e/golden-path.spec.ts` runs the golden path and 
 | Ledger entry      | `src/actions/ledger-entry.test.ts`                      | Statement import and chat-entered transactions through approval     |
 | Earmark editing   | `src/actions/earmark-update.test.ts`                    | Edit with guardrails and undo; queue cap; proposal expiry           |
 | Approval grouping | `src/actions/risk.test.ts`                              | Which proposals may share a card                                    |
+| Undo limits       | `src/actions/undo-guardrails.test.ts`                   | An undo passes the same limits as the change it makes               |
+| Taint             | `src/agent/taint.test.ts`                               | A paste or a tampered document cannot launder a proposal            |
 | Tier engine       | `src/actions/service.test.ts`, `guardrails.test.ts`     | Approval lifecycle, tokens, guardrails, provenance, T3, staleness   |
 | Edge fixtures     | `src/actions/edge-fixtures.test.ts`                     | Earmark over free cash, stale data, malformed CSVs                  |
 | Audit log         | `src/audit/log.test.ts`, `src/audit/verify-cli.test.ts` | Chain verifies; tampering, deletion and insertion all fail          |

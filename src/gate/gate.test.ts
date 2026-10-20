@@ -183,3 +183,42 @@ describe('outbound gate (PRV-1, PRV-2)', () => {
     expect(JSON.stringify(requests[0]?.payload)).not.toContain('081234567890');
   });
 });
+
+describe('redactor: identifiers written the way people actually type them', () => {
+  const none: RedactorConfig = { names: [], accountNumbers: [], policyNumbers: [] };
+  const kindsIn = (input: string, config: RedactorConfig = none) =>
+    redactText(input, config).redactions.map((redaction) => redaction.kind);
+
+  it.each([
+    ['0812-3456-7890', 'phone'],
+    ['+62 812 3456 7890', 'phone'],
+    ['(+62) 812.3456.7890', 'phone'],
+    ['0812 3456 7890', 'phone'],
+    ['(021) 555-1234', 'phone'],
+    ['3171 0123 4567 8901', 'nik'],
+    ['31.71.01-234567-8901', 'nik'],
+    ['12.345.678.9-012.345', 'nik'],
+    ['4111 1111 1111 1111', 'account-number'],
+    ['123-456-7890', 'account-number'],
+    ['\uFF10\uFF18\uFF11\uFF12\uFF13\uFF14\uFF15\uFF16\uFF17\uFF18\uFF19\uFF10', 'phone'],
+    ['rina\u200b@example.com', 'email'],
+  ])('removes %s', (input, kind) => {
+    const result = redactText(`call me on ${input} please`, none);
+    expect(result.redactions.map((redaction) => redaction.kind)).toContain(kind);
+    expect(result.text).not.toMatch(/\d{4}/);
+  });
+
+  it('matches known names and policy numbers in any case and spacing', () => {
+    const config: RedactorConfig = {
+      names: ['Rina Wulandari'],
+      accountNumbers: [],
+      policyNumbers: ['SP-2026-00123'],
+    };
+    const result = redactText('RINA  wulandari holds sp 2026 00123', config);
+    expect(result.text).toBe('[REDACTED:NAME] holds [REDACTED:POLICY-NUMBER]');
+  });
+
+  it('leaves amounts, dates and short numbers alone', () => {
+    expect(kindsIn('Rp 1.628.450.000 on 2026-10-13, 80 days, Rp 3 000 000')).toEqual([]);
+  });
+});

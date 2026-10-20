@@ -1,4 +1,4 @@
-import { formatRupiah, minMoney, subMoney, sumMoney, toMoney, type Money } from '../domain/money';
+import { addMoney, formatRupiah, minMoney, subMoney, sumMoney, toMoney, type Money } from '../domain/money';
 import type { Account, AuditEntry, Earmark, GuardrailResult, Settings, Transaction } from '../domain/schemas';
 import type { IsoDate } from '../domain/time';
 import type { LedgerSnapshot } from '../ledger/engine';
@@ -19,6 +19,9 @@ import {
  * point at exactly one rule.
  */
 export const MAX_ACTIVE_EARMARKS = 10;
+
+/** No single statement row may move more than this; a bigger figure is a typo or an attack. */
+export const MAX_IMPORT_ROW_AMOUNT = toMoney(1_000_000_000);
 
 /** PRD Section 6 simulated T3 limits. Settings can only tighten these. */
 export const SIM_T3_PER_TRANSFER_CAP = toMoney(2_000_000);
@@ -42,6 +45,8 @@ export const GUARDRAIL_RULES = {
   importNoDuplicates: 'no row is already in the ledger',
   importNotInFuture: 'no row is dated after today',
   importRowCount: `at most ${MAX_IMPORT_ROWS} rows`,
+  importRowSize: 'every row is at most Rp 1.000.000.000',
+  importNotTooOld: 'no row is more than a year old',
   transactionAccount: 'the account is in the ledger',
   transactionDate: 'the date is within the last year and not after today',
   transactionCap: 'amount <= perActionCap',
@@ -314,6 +319,8 @@ export interface StatementImportGuardrailContext {
   accounts: readonly Account[];
   transactions: readonly Transaction[];
   today: IsoDate;
+  /** One year before today. */
+  earliest: IsoDate;
 }
 
 export function checkStatementImportGuardrails(
@@ -360,6 +367,26 @@ export function checkStatementImportGuardrails(
       : fail(
           GUARDRAIL_RULES.importNotInFuture,
           `${future.length} row(s) are dated after ${context.today} (first: line ${future[0]!.line})`,
+        ),
+  );
+
+  const oversized = params.rows.filter((row) => Math.abs(row.amount) > MAX_IMPORT_ROW_AMOUNT);
+  results.push(
+    oversized.length === 0
+      ? pass(GUARDRAIL_RULES.importRowSize, 'no row is unusually large')
+      : fail(
+          GUARDRAIL_RULES.importRowSize,
+          `${oversized.length} row(s) exceed ${formatRupiah(MAX_IMPORT_ROW_AMOUNT)} (first: line ${oversized[0]!.line})`,
+        ),
+  );
+
+  const old = params.rows.filter((row) => row.date < context.earliest);
+  results.push(
+    old.length === 0
+      ? pass(GUARDRAIL_RULES.importNotTooOld, `every row is dated on or after ${context.earliest}`)
+      : fail(
+          GUARDRAIL_RULES.importNotTooOld,
+          `${old.length} row(s) are dated before ${context.earliest} (first: line ${old[0]!.line})`,
         ),
   );
 
@@ -463,6 +490,91 @@ export function checkUndoGuardrails(params: UndoParams, context: UndoGuardrailCo
       ? fail(GUARDRAIL_RULES.undoNotAlreadyUndone, 'this action has already been undone')
       : pass(GUARDRAIL_RULES.undoNotAlreadyUndone, 'not undone yet'),
   );
+
+  return results;
+}
+
+/** What reversing an executed action would do, worked out from the ledger as it is now. */
+export interface UndoEffect {
+  /** Change to the money set aside in earmarks (positive puts money back aside). */
+  earmarked: Money;
+  /** Active earmarks after the undo. */
+  earmarkCount: number;
+  /** Change to each account's balance. */
+  accountDeltas: Record<string, Money>;
+}
+
+export interface UndoEffectGuardrailContext {
+  snapshot: LedgerSnapshot;
+  accounts: readonly Account[];
+}
+
+/**
+ * An undo is a change to the ledger like any other, so it must pass the same
+ * limits as the action it resembles: putting an earmark back is checked like
+ * creating one, and removing income is checked like spending it. Only the
+ * rules the undo could break are listed, so undoing an earmark stays a
+ * one-line card.
+ */
+export function checkUndoEffectGuardrails(
+  effect: UndoEffect,
+  context: UndoEffectGuardrailContext,
+): GuardrailResult[] {
+  const { snapshot } = context;
+  const results: GuardrailResult[] = [];
+  const balanceChange = sumMoney(Object.values(effect.accountDeltas));
+  const freeCashDrop = toMoney(effect.earmarked - balanceChange);
+
+  if (freeCashDrop > 0) {
+    results.push(
+      freeCashDrop <= snapshot.freeCash
+        ? pass(
+            GUARDRAIL_RULES.freeCash,
+            `${formatRupiah(freeCashDrop)} of ${formatRupiah(snapshot.freeCash)} free cash`,
+          )
+        : fail(
+            GUARDRAIL_RULES.freeCash,
+            `undoing this takes ${formatRupiah(freeCashDrop)} from free cash of ${formatRupiah(snapshot.freeCash)}`,
+          ),
+    );
+    if (effect.earmarked > 0) {
+      results.push(
+        freeCashDrop <= snapshot.safeToSpend
+          ? pass(
+              GUARDRAIL_RULES.obligationsCovered,
+              `${formatRupiah(subMoney(snapshot.safeToSpend, freeCashDrop))} stays available after obligations due in 30 days`,
+            )
+          : fail(
+              GUARDRAIL_RULES.obligationsCovered,
+              `would leave ${formatRupiah(subMoney(snapshot.safeToSpend, freeCashDrop))} for obligations due in 30 days (${formatRupiah(snapshot.obligationsDueIn30Days)})`,
+            ),
+      );
+    }
+  }
+
+  if (effect.earmarkCount > MAX_ACTIVE_EARMARKS) {
+    results.push(
+      fail(
+        GUARDRAIL_RULES.maxActiveEarmarks,
+        `undoing this would make ${effect.earmarkCount} active earmarks; the limit is ${MAX_ACTIVE_EARMARKS}`,
+      ),
+    );
+  }
+
+  for (const [accountId, delta] of Object.entries(effect.accountDeltas)) {
+    if (delta >= 0) continue;
+    const name = context.accounts.find((account) => account.id === accountId)?.name ?? 'the account';
+    const balance = snapshot.balancesByAccount[accountId] ?? toMoney(0);
+    const after = addMoney(balance, delta);
+    results.push(
+      after >= 0
+        ? pass(GUARDRAIL_RULES.transactionBalance, `${name} would hold ${formatRupiah(after)}`)
+        : fail(
+            GUARDRAIL_RULES.transactionBalance,
+            `${name} holds ${formatRupiah(balance)}, so undoing this would leave ${formatRupiah(after)}`,
+          ),
+    );
+  }
 
   return results;
 }

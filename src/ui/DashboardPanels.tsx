@@ -284,6 +284,11 @@ function PolicyCard({
       <header className="card-header">
         <div>
           <strong>{policy.displayName}</strong>
+          {flagged.length > 0 ? (
+            <span className="badge-danger" data-testid="policy-tampered-badge">
+              Hidden instruction found
+            </span>
+          ) : null}
           <div className="muted small">
             {policy.insurer} · {policy.type} · {document.pageCount} page(s) ·{' '}
             {policy.startDate ? `cover from ${policy.startDate}` : 'start date not stated'}
@@ -299,6 +304,13 @@ function PolicyCard({
           Flagged: {flagged.map((clause) => `${clause.clauseRef} (page ${clause.page})`).join(', ')} contains
           text that reads like an instruction. It was treated as data, not followed, and is never sent to the
           model.
+          {flagged
+            .flatMap((clause) => clause.injectionSignals)
+            .map((signal) => (
+              <q key={signal} className="flagged-quote">
+                {signal}
+              </q>
+            ))}
         </p>
       ) : null}
 
@@ -384,11 +396,13 @@ export function PolicyPanel({
   const services = useServices();
   const t = useT();
   const [message, setMessage] = useState<string | null>(null);
+  const [flaggedOnLoad, setFlaggedOnLoad] = useState(false);
   const [busy, setBusy] = useState(false);
 
   const load = async (name: string, read: () => Promise<Uint8Array>) => {
     setBusy(true);
     setMessage(null);
+    setFlaggedOnLoad(false);
     try {
       const result = await importPolicyFile(
         { readPdf: services.readPdf, store: services.policies, gate: services.gate, audit: services.audit },
@@ -399,13 +413,14 @@ export function PolicyPanel({
         return;
       }
       const { extraction } = result;
+      setFlaggedOnLoad(extraction.injectionSignals.length > 0);
       setMessage(
         `Loaded ${extraction.policy.displayName}: ${extraction.items.length} benefit clause(s), each linked to its page and clause.` +
           (extraction.lowConfidence.length > 0
             ? ` ${extraction.lowConfidence.length} could not be read with confidence and are shown as written.`
             : '') +
           (extraction.injectionSignals.length > 0
-            ? ` ${extraction.injectionSignals.length} instruction-like sentence(s) were flagged and ignored.`
+            ? ` Warning: ${extraction.injectionSignals.length} hidden instruction(s) were found and ignored, for example “${extraction.injectionSignals[0]!.text}”. Nothing was proposed and the refusal is in the audit log.`
             : ''),
       );
       onChanged();
@@ -467,7 +482,11 @@ export function PolicyPanel({
       </p>
 
       {message ? (
-        <p className="message" role="status" data-testid="policy-message">
+        <p
+          className={flaggedOnLoad ? 'warning' : 'message'}
+          role={flaggedOnLoad ? 'alert' : 'status'}
+          data-testid="policy-message"
+        >
           {message}
         </p>
       ) : null}

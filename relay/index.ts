@@ -28,6 +28,12 @@ export interface RelayBindings {
    * figures from tool results exactly; left out, the provider's default applies.
    */
   MODEL_TEMPERATURE?: string;
+  /**
+   * The site allowed to call the relay, for example "https://wassup.example".
+   * When set, a request from any other origin is refused. Leave unset for local
+   * development. A deployed relay is otherwise an open proxy to a paid model.
+   */
+  RELAY_ALLOWED_ORIGIN?: string;
 }
 
 export interface RelayMessage {
@@ -204,7 +210,7 @@ function readBinding(env: RelayBindings | undefined, key: keyof RelayBindings): 
  */
 export const DEFAULT_RATE_LIMIT = 30;
 /** A whole conversation with every tool result is far below this. */
-export const MAX_BODY_BYTES = 256 * 1024;
+export const MAX_BODY_BYTES = 100_000;
 const WINDOW_MS = 60_000;
 const recent = new Map<string, number[]>();
 
@@ -226,6 +232,40 @@ export function allowRequest(client: string, limit: number, now = Date.now()): b
 /** Tests only. */
 export function resetRateLimit(): void {
   recent.clear();
+}
+
+/** Roles the app may send. Anything else is refused rather than forwarded. */
+const ALLOWED_ROLES = new Set(['system', 'user', 'assistant', 'tool']);
+
+/**
+ * Accept only the shape the app sends: a messages array, string content, known
+ * roles, and at most one system message, first. A relay is a public URL, so it
+ * must not forward arbitrary provider payloads on the operator's credit.
+ */
+export function validateRelayBody(
+  body: unknown,
+): { ok: true; body: RelayRequestBody } | { ok: false; error: string } {
+  const candidate = body as Partial<RelayRequestBody> | null;
+  if (!candidate || !Array.isArray(candidate.messages)) {
+    return { ok: false, error: 'expected a JSON body with a "messages" array' };
+  }
+
+  for (const [index, message] of candidate.messages.entries()) {
+    if (!message || typeof message !== 'object') {
+      return { ok: false, error: `message ${index} is not an object` };
+    }
+    if (!ALLOWED_ROLES.has(message.role)) {
+      return { ok: false, error: `message ${index} has an unknown role` };
+    }
+    if (typeof message.content !== 'string') {
+      return { ok: false, error: `message ${index} content must be a string` };
+    }
+    if (message.role === 'system' && index !== 0) {
+      return { ok: false, error: 'a system message is only accepted first' };
+    }
+  }
+
+  return { ok: true, body: candidate as RelayRequestBody };
 }
 
 function rateLimit(env: RelayBindings | undefined): number {
@@ -277,6 +317,11 @@ app.post('/api/model', async (c) => {
     );
   }
 
+  const allowedOrigin = readBinding(c.env, 'RELAY_ALLOWED_ORIGIN');
+  if (allowedOrigin && c.req.header('origin') !== allowedOrigin) {
+    return c.json({ error: 'requests are accepted only from the app itself' }, 403);
+  }
+
   if (Number(c.req.header('content-length') ?? 0) > MAX_BODY_BYTES) {
     return c.json({ error: 'the request is too large' }, 413);
   }
@@ -291,16 +336,29 @@ app.post('/api/model', async (c) => {
     return c.json({ error: 'too many model requests; wait a minute and try again' }, 429);
   }
 
-  let body: RelayRequestBody;
+  // content-length can be absent or wrong, so the real body is measured too.
+  let raw: string;
   try {
-    body = await c.req.json<RelayRequestBody>();
+    raw = await c.req.text();
+  } catch {
+    return c.json({ error: 'expected a JSON body with a "messages" array' }, 400);
+  }
+  if (raw.length > MAX_BODY_BYTES) {
+    return c.json({ error: 'the request is too large' }, 413);
+  }
+
+  let parsed: unknown;
+  try {
+    parsed = JSON.parse(raw) as unknown;
   } catch {
     return c.json({ error: 'expected a JSON body with a "messages" array' }, 400);
   }
 
-  if (!Array.isArray(body.messages)) {
-    return c.json({ error: 'expected a JSON body with a "messages" array' }, 400);
+  const validated = validateRelayBody(parsed);
+  if (!validated.ok) {
+    return c.json({ error: validated.error }, 400);
   }
+  const body = validated.body;
 
   const url = readBinding(c.env, 'MODEL_API_URL') ?? DEFAULT_MODEL_API_URL;
   const temperature = Number(readBinding(c.env, 'MODEL_TEMPERATURE') ?? Number.NaN);

@@ -1,5 +1,5 @@
 import { randomHex } from '../domain/ids';
-import { addMoney, negateMoney, toMoney } from '../domain/money';
+import { addMoney, negateMoney, sumMoney, toMoney, type Money } from '../domain/money';
 import {
   ProposalSchema,
   type AuditActor,
@@ -19,7 +19,7 @@ import type { AppDatabase } from '../storage/db';
 import type { Repositories } from '../storage/repositories';
 import type { ApprovalService, ApprovalToken } from './approvals';
 import type { Clock } from './clock';
-import { createExecutor } from './executor';
+import { createExecutor, transactionIdPrefix } from './executor';
 import {
   allPass,
   checkEarmarkCreateGuardrails,
@@ -28,16 +28,18 @@ import {
   checkStatementImportGuardrails,
   checkTransactionAddGuardrails,
   checkTransferGuardrails,
+  checkUndoEffectGuardrails,
   checkUndoGuardrails,
   failedRules,
   GUARDRAIL_RULES,
   type EarmarkGuardrailContext,
+  type UndoEffect,
 } from './guardrails';
 import { parseActionParams, type ParsedActionParams } from './params';
 import { hashProposal } from './proposal-hash';
 import { checkProvenance } from './provenance';
 import { lookupAction, requiresApproval, type ActionDefinition } from './registry';
-import { verifyPin } from './pin';
+import { pinGuardFor } from './pin';
 import { evaluateStaleness, type StalenessReport } from './staleness';
 
 /**
@@ -203,6 +205,7 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
           accounts: await repos.accounts.all(),
           transactions: await repos.transactions.all(),
           today: context.snapshot.asOf,
+          earliest: addDays(context.snapshot.asOf, -366),
         });
       }
       case 'transaction.add': {
@@ -216,11 +219,19 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
       }
       case 'undo': {
         const entry = await repos.audit.byId(parsed.params.auditEntryId);
-        return checkUndoGuardrails(parsed.params, {
+        const basic = checkUndoGuardrails(parsed.params, {
           entry,
           reversible: entry ? (lookupAction(entry.action ?? '')?.reversible ?? false) : false,
           alreadyUndone: entry ? await isAlreadyUndone(entry) : false,
         });
+        if (!entry || !allPass(basic)) return basic;
+        return [
+          ...basic,
+          ...checkUndoEffectGuardrails(await undoEffect(entry, context.activeEarmarks), {
+            snapshot: context.snapshot,
+            accounts: await repos.accounts.all(),
+          }),
+        ];
       }
     }
   }
@@ -269,34 +280,61 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
         return { earmarked: 0, balance: parsed.params.amount, earmarkCount: count };
       case 'undo': {
         const entry = await repos.audit.byId(parsed.params.auditEntryId);
-        const original = entry?.proposalId ? await repos.proposals.byId(entry.proposalId) : undefined;
-        const amount = typeof original?.params?.['amount'] === 'number' ? original.params['amount'] : 0;
-
-        switch (entry?.action) {
-          case 'transfer':
-            // Reversing a transfer between the user's own accounts moves no
-            // totals and no earmarks, so the card must show no change.
-            return { earmarked: 0, balance: 0, earmarkCount: count };
-          case 'earmark.delete':
-            return { earmarked: amount, balance: 0, earmarkCount: count + 1 };
-          case 'earmark.update': {
-            const before = (original?.params?.['previous'] as { amount?: unknown } | undefined)?.amount;
-            const restored = typeof before === 'number' ? before - (amount || before) : 0;
-            return { earmarked: restored, balance: 0, earmarkCount: count };
-          }
-          case 'transaction.add':
-            return { earmarked: 0, balance: -amount, earmarkCount: count };
-          case 'statement.import': {
-            const rows = original?.params?.['rows'];
-            const net = Array.isArray(rows)
-              ? await importNet(rows as Array<{ account: string; amount: number }>)
-              : 0;
-            return { earmarked: 0, balance: -net, earmarkCount: count };
-          }
-          default:
-            return { earmarked: -amount, balance: 0, earmarkCount: Math.max(0, count - 1) };
-        }
+        if (!entry) return { earmarked: 0, balance: 0, earmarkCount: count };
+        const effect = await undoEffect(entry, activeEarmarks);
+        return {
+          earmarked: effect.earmarked,
+          balance: sumMoney(Object.values(effect.accountDeltas)),
+          earmarkCount: effect.earmarkCount,
+        };
       }
+    }
+  }
+
+  /**
+   * What reversing an executed action would do to the ledger as it is now. The
+   * figures come from the stored earmark and the rows that execution wrote, not
+   * from the original proposal, so the card and the guardrails see the same
+   * effect the executor will apply.
+   */
+  async function undoEffect(entry: AuditEntry, activeEarmarks: readonly Earmark[]): Promise<UndoEffect> {
+    const count = activeEarmarks.length;
+    const none: UndoEffect = { earmarked: toMoney(0), earmarkCount: count, accountDeltas: {} };
+    const original = entry.proposalId ? await repos.proposals.byId(entry.proposalId) : undefined;
+    const earmarkId = original?.params?.['earmarkId'];
+
+    switch (entry.action) {
+      case 'earmark.create': {
+        const earmark = (await repos.earmarks.all()).find((candidate) => candidate.createdBy === entry.id);
+        if (!earmark?.active) return none;
+        return { ...none, earmarked: negateMoney(earmark.amount), earmarkCount: Math.max(0, count - 1) };
+      }
+      case 'earmark.delete': {
+        const earmark = typeof earmarkId === 'string' ? await repos.earmarks.byId(earmarkId) : undefined;
+        if (!earmark || earmark.active) return none;
+        return { ...none, earmarked: earmark.amount, earmarkCount: count + 1 };
+      }
+      case 'earmark.update': {
+        const earmark = typeof earmarkId === 'string' ? await repos.earmarks.byId(earmarkId) : undefined;
+        const previous = (original?.params?.['previous'] as { amount?: unknown } | undefined)?.amount;
+        if (!earmark?.active || typeof previous !== 'number') return none;
+        return { ...none, earmarked: toMoney(previous - earmark.amount) };
+      }
+      case 'statement.import':
+      case 'transaction.add': {
+        const prefix = transactionIdPrefix(entry.id);
+        const accountDeltas: Record<string, Money> = {};
+        for (const transaction of await repos.transactions.all()) {
+          if (!transaction.id.startsWith(prefix)) continue;
+          accountDeltas[transaction.accountId] = toMoney(
+            (accountDeltas[transaction.accountId] ?? 0) - transaction.amount,
+          );
+        }
+        return { ...none, accountDeltas };
+      }
+      default:
+        // A transfer between the user's own accounts moves no totals.
+        return none;
     }
   }
 
@@ -484,8 +522,20 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
     // a mistyped PIN does not burn the one-time token.
     if (proposal.tier === 'T3') {
       const currentSettings = await settings();
-      if (!input.pin || !(await verifyPin(input.pin, currentSettings.pinHash))) {
-        return { kind: 'rejected', reason: 'step-up PIN required for a simulated transfer' };
+      const pinCheck = await pinGuardFor(db).check(input.pin, currentSettings.pinHash);
+      if (!pinCheck.ok) {
+        await audit.append({
+          actor: 'user',
+          event: 'refused',
+          action: proposal.action,
+          proposalId: proposal.proposalId,
+          detail: `step-up PIN refused: ${pinCheck.reason} (${pinCheck.failures} in a row)`,
+          payload: { reason: 'pin', failures: pinCheck.failures, locked: pinCheck.locked },
+        });
+        return {
+          kind: 'rejected',
+          reason: pinCheck.locked ? pinCheck.reason : 'step-up PIN required for a simulated transfer',
+        };
       }
     }
 
@@ -666,7 +716,10 @@ export function createActionService(deps: ActionServiceDeps): ActionService {
 
   async function undoLast(actor: AuditActor = 'user'): Promise<ProposeResult> {
     const entries = await repos.audit.all();
-    const executed = [...entries].reverse().find((entry) => entry.event === 'executed');
+    // Settings changes are logged as executed too, but have no proposal and cannot be undone.
+    const executed = [...entries]
+      .reverse()
+      .find((entry) => entry.event === 'executed' && entry.proposalId !== null);
     if (!executed) {
       return refuse(
         { action: 'undo', params: {}, provenance: { requestedBy: 'ui', untrustedInputs: [] }, actor },

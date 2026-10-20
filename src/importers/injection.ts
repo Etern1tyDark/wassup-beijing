@@ -16,10 +16,27 @@ const INJECTION_PATTERNS: RegExp[] = [
   /\b(new|updated)\s+instructions?\s*:/i,
   /\braise\s+(my\s+)?limits?\b/i,
   /\boverride\s+(the\s+)?(tier|guardrail|limit|rules?)\b/i,
+  /\b(forget|ignore|disregard)\s+(everything|all)\b/i,
+  /\bkindly\s+(ignore|disregard)\b/i,
+  // Bahasa Indonesia: "abaikan instruksi sebelumnya", "transfer dana", "kirim uang".
+  /\b(abaikan|lupakan)\s+(semua\s+)?(instruksi|perintah|aturan)\b/i,
+  /\b(transfer|kirim(kan)?)\s+(dana|uang|saldo)\b/i,
+  // Chinese: "忽略之前的指令", "转账".
+  /(忽略|无视).{0,6}(指令|指示|规则)/,
+  /(转账|汇款)/,
 ];
 
+/** Zero-width and other invisible format characters used to split trigger words. */
+const INVISIBLE = /[\u00AD\u180E\u200B-\u200F\u202A-\u202E\u2060-\u2064\uFEFF]/g;
+
+/** Fold full-width forms and drop invisible characters before matching. */
+function normalise(text: string): string {
+  return text.normalize('NFKC').replace(INVISIBLE, '');
+}
+
 export function looksLikeInjection(text: string): boolean {
-  return INJECTION_PATTERNS.some((pattern) => pattern.test(text));
+  const normalised = normalise(text);
+  return INJECTION_PATTERNS.some((pattern) => pattern.test(normalised));
 }
 
 /** Sentences inside untrusted text that look like instructions; used for the reply. */

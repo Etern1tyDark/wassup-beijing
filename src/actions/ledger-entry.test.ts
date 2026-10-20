@@ -46,7 +46,7 @@ describe('statement.import (ING-1, LED-3)', () => {
       before: before.freeCash,
       after: before.freeCash - 385_000,
     });
-    expect(result.proposal.guardrails.map((rule) => rule.pass)).toEqual([true, true, true, true]);
+    expect(result.proposal.guardrails.map((rule) => rule.pass)).toEqual([true, true, true, true, true, true]);
     expect(result.proposal.provenance.untrustedInputs).toEqual([
       { source: 'csv', ref: 'statement-october.csv', fields: ['rows'] },
     ]);
@@ -216,5 +216,30 @@ describe('transaction.add (ING-4)', () => {
     if (undo.kind !== 'proposal') throw new Error(undo.reason);
     await w.approveAndExecute(undo.proposal.proposalId);
     expect(await w.actions.snapshot()).toEqual(before);
+  });
+});
+
+describe('statement.import sanity limits (red-team finding)', () => {
+  it('refuses a row that is absurdly large or more than a year old', async () => {
+    const snapshot = await w.actions.snapshot();
+    const account = (await w.repos.accounts.all())[0]!.name;
+    const result = await w.actions.propose({
+      action: 'statement.import',
+      params: {
+        fileName: 'odd.csv',
+        fileHash: `sha256:${'0'.repeat(64)}`,
+        rows: [
+          { line: 2, date: snapshot.asOf, description: 'TOP UP', amount: 900_000_000_000, account },
+          { line: 3, date: '2020-01-01', description: 'OLD', amount: 1_000, account },
+        ],
+      },
+      provenance: { requestedBy: 'ui_statement_import', untrustedInputs: [] },
+    });
+    expect(result.kind).toBe('refused');
+    if (result.kind !== 'refused') return;
+    const failed = result.guardrails.filter((rule) => !rule.pass).map((rule) => rule.rule);
+    expect(failed).toEqual(
+      expect.arrayContaining([GUARDRAIL_RULES.importRowSize, GUARDRAIL_RULES.importNotTooOld]),
+    );
   });
 });

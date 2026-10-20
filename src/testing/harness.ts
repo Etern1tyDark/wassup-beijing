@@ -187,7 +187,7 @@ export async function createTestWorld(options: TestWorldOptions = {}): Promise<T
   const audit = createAuditLog(db, clock.now.bind(clock));
   const approvals = createApprovalService();
   const actions = createActionService({ db, repos, audit, approvals, clock });
-  const settings = createSettingsService(db);
+  const settings = createSettingsService(db, audit);
 
   return {
     db,
