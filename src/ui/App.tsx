@@ -1,4 +1,4 @@
-import { useCallback, useContext, useEffect, useRef, useState, type FormEvent } from 'react';
+import { useCallback, useContext, useEffect, useRef, useState, type FormEvent, type ReactNode } from 'react';
 import { formatRupiah, parseRupiah, toMoney } from '../domain/money';
 import { SeedDatasetSchema } from '../domain/seed';
 import { loadSeedData } from '../storage/bootstrap';
@@ -18,8 +18,11 @@ import { formatTimestamp, shortHash } from './app-state';
 import { groupByRisk } from '../actions/risk';
 import { looksLikeInjection } from '../importers/injection';
 import { ChatPanel } from './ChatPanel';
-import { LanguageContext, useT } from './i18n';
+import { LanguageContext, useT, type StringKey } from './i18n';
 import { PolicyPanel, RunwayPanel, StatementImportPanel } from './DashboardPanels';
+import { Icon, type IconName } from './icons';
+import { useTheme } from './theme';
+import { CardTitle } from './ui-kit';
 import seedFixture from '../../fixtures/seed/rina.json';
 import './styles.css';
 
@@ -31,26 +34,52 @@ function moneyDelta(delta: { before: number; after: number } | undefined): strin
   return `${formatRupiah(toMoney(delta.before))} ${arrow} ${formatRupiah(toMoney(delta.after))}`;
 }
 
+type Delta = { before: number; after: number } | undefined;
+
+function direction(delta: Delta): 'down' | 'up' | 'same' {
+  if (!delta || delta.after === delta.before) return 'same';
+  return delta.after < delta.before ? 'down' : 'up';
+}
+
+/** Before and after, side by side, so the effect of approving is read at a glance. */
 function DiffTable({ diff }: { diff: ProposalDiff }) {
-  const rows: Array<{ label: string; value: string }> = [
-    { label: 'Safe to spend', value: moneyDelta(diff.safeToSpend) },
-    { label: 'Free cash', value: moneyDelta(diff.freeCash) },
-    {
-      label: 'Runway',
-      value: diff.runwayMonths ? `${diff.runwayMonths.before} → ${diff.runwayMonths.after} months` : '—',
-    },
-    {
-      label: 'Active earmarks',
-      value: diff.activeEarmarks ? `${diff.activeEarmarks.before} → ${diff.activeEarmarks.after}` : '—',
-    },
+  const money = (value: number): string => formatRupiah(toMoney(value));
+  const rows: Array<{ label: string; delta: Delta; format: (value: number) => string }> = [
+    { label: 'Safe to spend', delta: diff.safeToSpend, format: money },
+    { label: 'Free cash', delta: diff.freeCash, format: money },
+    { label: 'Runway', delta: diff.runwayMonths, format: (value) => `${value} months` },
+    { label: 'Active earmarks', delta: diff.activeEarmarks, format: String },
   ];
   return (
-    <table className="diff" data-testid="approval-diff">
+    <table className="diff diff-compare" data-testid="approval-diff">
+      <thead>
+        <tr>
+          <th scope="col">
+            <span className="visually-hidden">Measure</span>
+          </th>
+          <th scope="col">Now</th>
+          <th scope="col">After approval</th>
+        </tr>
+      </thead>
       <tbody>
         {rows.map((row) => (
           <tr key={row.label}>
             <th scope="row">{row.label}</th>
-            <td>{row.value}</td>
+            {row.delta ? (
+              <>
+                <td>{row.format(row.delta.before)}</td>
+                <td className={`delta delta-${direction(row.delta)}`}>
+                  <span aria-hidden="true" className="delta-arrow">
+                    {direction(row.delta) === 'down' ? '↓' : direction(row.delta) === 'up' ? '↑' : '='}
+                  </span>{' '}
+                  {row.format(row.delta.after)}
+                </td>
+              </>
+            ) : (
+              <td colSpan={2} className="muted">
+                —
+              </td>
+            )}
           </tr>
         ))}
       </tbody>
@@ -187,15 +216,23 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
 
   return (
     <article className="card approval" data-testid="approval-card" ref={cardRef} tabIndex={-1}>
-      <header className="card-header">
-        <h3>
-          {t('approval.needed')} · {proposal.action}{' '}
-          <span className={`tier tier-${proposal.tier.toLowerCase()}`}>{proposal.tier}</span>
-        </h3>
+      <header className="approval-head">
+        <span className="approval-icon" aria-hidden="true">
+          <Icon name="shield" />
+        </span>
+        <div className="approval-title">
+          <span className="eyebrow">{t('approval.needed')}</span>
+          <h3>
+            <code className="action-name">{proposal.action}</code>{' '}
+            <span className={`tier tier-${proposal.tier.toLowerCase()}`}>{proposal.tier}</span>
+          </h3>
+        </div>
         {proposal.tier === 'T3' ? <p className="simulation-label">SIMULATION - no real money moves</p> : null}
       </header>
 
-      <p data-testid="approval-summary">{describeProposal(proposal, state.accountNames, state.audit)}</p>
+      <p className="approval-summary" data-testid="approval-summary">
+        {describeProposal(proposal, state.accountNames, state.audit)}
+      </p>
 
       {flaggedRows.length > 0 ? (
         <p className="warning" role="alert" data-testid="approval-untrusted">
@@ -210,7 +247,12 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
       <ul className="guardrails" data-testid="approval-guardrails">
         {proposal.guardrails.map((rule) => (
           <li key={rule.rule} className={rule.pass ? 'pass' : 'fail'}>
-            <span aria-hidden="true">{rule.pass ? '✓' : '✕'}</span> {rule.rule} — {rule.detail}
+            <span className="guardrail-mark" aria-hidden="true">
+              <Icon name={rule.pass ? 'check' : 'x'} size={14} />
+            </span>
+            <span>
+              <code>{rule.rule}</code> — {rule.detail}
+            </span>
           </li>
         ))}
       </ul>
@@ -250,7 +292,7 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
         </label>
       ) : null}
 
-      <div className="actions">
+      <div className="actions approval-actions">
         <button
           type="button"
           className="primary"
@@ -258,9 +300,16 @@ function ApprovalCard({ proposal, onChanged }: { proposal: Proposal; onChanged: 
           disabled={busy || !token}
           onClick={() => void decide('approve')}
         >
+          <Icon name="check" size={16} />
           {t('approval.approve')}
         </button>
-        <button type="button" data-testid="reject" disabled={busy} onClick={() => void decide('reject')}>
+        <button
+          type="button"
+          className="ghost-danger"
+          data-testid="reject"
+          disabled={busy}
+          onClick={() => void decide('reject')}
+        >
           {t('approval.reject')}
         </button>
       </div>
@@ -329,15 +378,21 @@ function LowRiskGroupCard({ proposals, onChanged }: { proposals: Proposal[]; onC
 
   return (
     <article className="card approval" data-testid="approval-group">
-      <header className="card-header">
-        <h3>
-          {proposals.length} low-risk changes <span className="tier tier-t2">T2</span>
-        </h3>
+      <header className="approval-head">
+        <span className="approval-icon" aria-hidden="true">
+          <Icon name="check" />
+        </span>
+        <div className="approval-title">
+          <span className="eyebrow">Grouped</span>
+          <h3>
+            {proposals.length} low-risk changes <span className="tier tier-t2">T2</span>
+          </h3>
+        </div>
       </header>
       <p className="muted small">
         None of these lowers what you can spend. Each is still approved, checked and logged on its own.
       </p>
-      <table>
+      <table className="group-table">
         <thead>
           <tr>
             <th scope="col">Change</th>
@@ -422,20 +477,26 @@ function EarmarkForm({ onChanged }: { onChanged: () => void }) {
 
   return (
     <form className="card" onSubmit={(event) => void submit(event)} data-testid="earmark-form">
-      <h3>{t('earmarks.propose')}</h3>
-      <label className="field">
-        <span>Label</span>
-        <input value={label} data-testid="earmark-label" onChange={(event) => setLabel(event.target.value)} />
-      </label>
-      <label className="field">
-        <span>Amount (integer rupiah)</span>
-        <input
-          value={amount}
-          inputMode="numeric"
-          data-testid="earmark-amount"
-          onChange={(event) => setAmount(event.target.value)}
-        />
-      </label>
+      <CardTitle icon="plus" title={t('earmarks.propose')} sub="Money set aside stays in your account." />
+      <div className="field-row">
+        <label className="field">
+          <span>Label</span>
+          <input
+            value={label}
+            data-testid="earmark-label"
+            onChange={(event) => setLabel(event.target.value)}
+          />
+        </label>
+        <label className="field">
+          <span>Amount (integer rupiah)</span>
+          <input
+            value={amount}
+            inputMode="numeric"
+            data-testid="earmark-amount"
+            onChange={(event) => setAmount(event.target.value)}
+          />
+        </label>
+      </div>
       <label className="field">
         <span>Review date</span>
         <input
@@ -460,59 +521,127 @@ function EarmarkForm({ onChanged }: { onChanged: () => void }) {
 
 /* -------------------------------------------------------------------- panels */
 
+/** The four headline figures as tiles. Safe to spend leads: it is the number the rest explain. */
 function BalancesPanel({
   snapshot,
   staleness,
-  accounts,
 }: {
   snapshot: LedgerSnapshot;
   staleness: StalenessReport | null;
-  accounts: Record<string, string>;
 }) {
   const t = useT();
-  const { state } = useAppStateContext();
+  const share = (part: number): number =>
+    snapshot.totalBalance > 0
+      ? Math.max(0, Math.min(100, Math.round((part / snapshot.totalBalance) * 100)))
+      : 0;
+  const tiles: Array<{
+    key: string;
+    label: string;
+    value: number;
+    testId: string;
+    icon: IconName;
+    note: string;
+  }> = [
+    {
+      key: 'total',
+      label: t('balances.total'),
+      value: snapshot.totalBalance,
+      testId: 'total-balance',
+      icon: 'wallet',
+      note: `${Object.keys(snapshot.balancesByAccount).length} account(s)`,
+    },
+    {
+      key: 'free',
+      label: t('balances.freeCash'),
+      value: snapshot.freeCash,
+      testId: 'free-cash',
+      icon: 'sparkle',
+      note: `${share(snapshot.freeCash)}% of the total is not set aside`,
+    },
+    {
+      key: 'obligations',
+      label: t('balances.obligations'),
+      value: snapshot.obligationsDueIn30Days,
+      testId: 'obligations-30',
+      icon: 'log',
+      note: 'Bills and recurring costs',
+    },
+  ];
   return (
-    <section className="card" data-testid="balances">
-      <h3>
+    <section className="balances" data-testid="balances" aria-labelledby="balances-title">
+      <h3 id="balances-title" className="visually-hidden">
         {t('balances.title')} {snapshot.asOf}
       </h3>
       {staleness?.stale ? (
         <p className="warning" data-testid="stale-banner" role="alert">
-          Data is stale: {staleness.reason}
+          <Icon name="alert" size={16} /> Data is stale: {staleness.reason}
         </p>
       ) : null}
-      <dl className="totals">
-        <div>
-          <dt>{t('balances.safeToSpend')}</dt>
+      <dl className="kpis">
+        <div className="kpi kpi-hero">
+          <dt>
+            <Icon name="shield" size={16} /> {t('balances.safeToSpend')}
+          </dt>
           <dd data-testid="safe-to-spend">{formatRupiah(snapshot.safeToSpend)}</dd>
+          <p className="kpi-note">After earmarks and what is due in the next 30 days</p>
+          <div className="kpi-meter" aria-hidden="true">
+            <span style={{ width: `${share(snapshot.safeToSpend)}%` }} />
+          </div>
         </div>
-        <div>
-          <dt>{t('balances.total')}</dt>
-          <dd data-testid="total-balance">{formatRupiah(snapshot.totalBalance)}</dd>
-        </div>
-        <div>
-          <dt>{t('balances.freeCash')}</dt>
-          <dd data-testid="free-cash">{formatRupiah(snapshot.freeCash)}</dd>
-        </div>
-        <div>
-          <dt>{t('balances.obligations')}</dt>
-          <dd data-testid="obligations-30">{formatRupiah(snapshot.obligationsDueIn30Days)}</dd>
-        </div>
+        {tiles.map((tile) => (
+          <div className="kpi" key={tile.key}>
+            <dt>
+              <Icon name={tile.icon} size={16} /> {tile.label}
+            </dt>
+            <dd data-testid={tile.testId}>{formatRupiah(toMoney(tile.value))}</dd>
+            <p className="kpi-note">{tile.note}</p>
+          </div>
+        ))}
       </dl>
+    </section>
+  );
+}
+
+function AccountsPanel({
+  snapshot,
+  accounts,
+}: {
+  snapshot: LedgerSnapshot;
+  accounts: Record<string, string>;
+}) {
+  const t = useT();
+  const { state } = useAppStateContext();
+  const entries = Object.entries(snapshot.balancesByAccount);
+  const largest = Math.max(1, ...entries.map(([, balance]) => Math.abs(balance)));
+  return (
+    <section className="card" data-testid="accounts">
+      <CardTitle icon="wallet" title={t('accounts.title')} sub={`${t('app.asOf')} ${snapshot.asOf}`} />
       <table className="accounts">
         <thead>
           <tr>
             <th scope="col">{t('balances.account')}</th>
             <th scope="col">{t('balances.type')}</th>
-            <th scope="col">{t('balances.balance')}</th>
+            <th scope="col" className="num">
+              {t('balances.balance')}
+            </th>
           </tr>
         </thead>
         <tbody>
-          {Object.entries(snapshot.balancesByAccount).map(([accountId, balance]) => (
+          {entries.map(([accountId, balance]) => (
             <tr key={accountId}>
-              <td>{state.accountNames[accountId] ?? accountId}</td>
-              <td>{accounts[accountId] ?? '—'}</td>
-              <td>{formatRupiah(balance)}</td>
+              <td>
+                <span className="account-name">{state.accountNames[accountId] ?? accountId}</span>
+                <span className="bar" aria-hidden="true">
+                  <span
+                    className={balance < 0 ? 'bar-negative' : undefined}
+                    style={{ width: `${Math.round((Math.abs(balance) / largest) * 100)}%` }}
+                  />
+                </span>
+              </td>
+              <td>
+                <span className="pill">{accounts[accountId] ?? '—'}</span>
+              </td>
+              <td className="num">{formatRupiah(balance)}</td>
             </tr>
           ))}
         </tbody>
@@ -563,10 +692,14 @@ function EarmarkRow({
   return (
     <>
       <tr data-testid={`earmark-${earmark.id}`}>
-        <td>{earmark.label}</td>
-        <td>{formatRupiah(earmark.amount)}</td>
+        <td className="strong">{earmark.label}</td>
+        <td className="num">{formatRupiah(earmark.amount)}</td>
         <td>{earmark.reviewDate}</td>
-        <td>{earmark.active ? 'active' : 'released'}</td>
+        <td>
+          <span className={`pill ${earmark.active ? 'pill-good' : ''}`}>
+            {earmark.active ? 'active' : 'released'}
+          </span>
+        </td>
         <td>
           {earmark.active ? (
             <div className="actions">
@@ -587,7 +720,7 @@ function EarmarkRow({
       {editing ? (
         <tr>
           <td colSpan={5}>
-            <form className="actions" onSubmit={(event) => void propose(event)}>
+            <form className="actions inline-form" onSubmit={(event) => void propose(event)}>
               <label className="field">
                 <span>New amount (integer rupiah)</span>
                 <input
@@ -630,7 +763,11 @@ function EarmarksPanel({
   const t = useT();
   return (
     <section className="card" data-testid="earmarks">
-      <h3>{t('earmarks.title')}</h3>
+      <CardTitle
+        icon="wallet"
+        title={t('earmarks.title')}
+        sub={`${earmarks.filter((earmark) => earmark.active).length} active`}
+      />
       {notice ? (
         <p className="warning" role="status" data-testid="earmark-notice">
           {notice}
@@ -645,7 +782,9 @@ function EarmarksPanel({
           <thead>
             <tr>
               <th scope="col">Label</th>
-              <th scope="col">Amount</th>
+              <th scope="col" className="num">
+                Amount
+              </th>
               <th scope="col">Review</th>
               <th scope="col">Status</th>
               <th scope="col">Action</th>
@@ -703,20 +842,20 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
 
   return (
     <section className="card" data-testid="audit-log">
-      <header className="card-header">
-        <h3>{t('audit.title')}</h3>
-        <div className="actions">
-          <button type="button" data-testid="undo" onClick={() => void undo()}>
-            {t('audit.undo')}
-          </button>
-          <button type="button" data-testid="verify-audit" onClick={() => void verify()}>
-            {t('audit.verify')}
-          </button>
-          <button type="button" data-testid="export-audit" onClick={() => void exportJson()}>
-            {t('audit.export')}
-          </button>
-        </div>
-      </header>
+      <CardTitle icon="log" title={t('audit.title')} sub={`${state.audit.length} entries, hash-chained`}>
+        <button type="button" data-testid="undo" onClick={() => void undo()}>
+          <Icon name="undo" size={16} />
+          {t('audit.undo')}
+        </button>
+        <button type="button" data-testid="verify-audit" onClick={() => void verify()}>
+          <Icon name="link" size={16} />
+          {t('audit.verify')}
+        </button>
+        <button type="button" data-testid="export-audit" onClick={() => void exportJson()}>
+          <Icon name="download" size={16} />
+          {t('audit.export')}
+        </button>
+      </CardTitle>
 
       {verification ? (
         <p className="message" role="status" data-testid="audit-verification">
@@ -735,8 +874,8 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
           No entries yet.
         </p>
       ) : (
-        <div className="scroll">
-          <table>
+        <div className="scroll scroll-tall">
+          <table className="audit-table">
             <thead>
               <tr>
                 <th scope="col">#</th>
@@ -750,13 +889,13 @@ function AuditPanel({ onChanged }: { onChanged: () => void }) {
             <tbody>
               {state.audit.map((entry) => (
                 <tr key={entry.id} data-testid={`audit-${entry.event}`}>
-                  <td>{entry.seq}</td>
-                  <td>{formatTimestamp(entry.time)}</td>
+                  <td className="num muted">{entry.seq}</td>
+                  <td className="nowrap muted">{formatTimestamp(entry.time)}</td>
                   <td>{entry.actor}</td>
                   <td>
                     <span className={`event event-${entry.event}`}>{entry.event}</span>
                   </td>
-                  <td>{entry.action ?? '—'}</td>
+                  <td>{entry.action ? <code>{entry.action}</code> : '—'}</td>
                   <td>{entry.detail}</td>
                 </tr>
               ))}
@@ -789,8 +928,7 @@ function PrivacyPanel({ outbound, onChanged }: { outbound: OutboundRequest[]; on
 
   return (
     <section className="card" data-testid="privacy-panel">
-      <header className="card-header">
-        <h3>{t('privacy.title')}</h3>
+      <CardTitle icon="eye" title={t('privacy.title')} sub={`${outbound.length} request(s) logged`}>
         <div className="actions">
           <label className="toggle">
             <input
@@ -805,7 +943,7 @@ function PrivacyPanel({ outbound, onChanged }: { outbound: OutboundRequest[]; on
             Send probe
           </button>
         </div>
-      </header>
+      </CardTitle>
       {outbound.length === 0 ? (
         <p className="muted" data-testid="privacy-empty">
           {t('privacy.empty')}
@@ -814,8 +952,11 @@ function PrivacyPanel({ outbound, onChanged }: { outbound: OutboundRequest[]; on
         <ul className="outbound scroll">
           {outbound.map((request) => (
             <li key={request.id} data-testid="outbound-request">
-              <strong>{request.purpose}</strong> · {formatTimestamp(request.time)} ·{' '}
-              <span className={`event event-${request.status}`}>{request.status}</span>
+              <div className="outbound-head">
+                <code className="strong">{request.purpose}</code>
+                <span className={`event event-${request.status}`}>{request.status}</span>
+                <span className="muted small">{formatTimestamp(request.time)}</span>
+              </div>
               {request.blockReason ? <span className="muted"> · {request.blockReason}</span> : null}
               {request.redactions.length > 0 ? (
                 <div className="redactions" data-testid="outbound-redactions">
@@ -867,34 +1008,45 @@ function SettingsPanel({ settings, onChanged }: { settings: Settings | null; onC
 
   return (
     <section className="card" data-testid="settings-panel">
-      <h3>{t('settings.title')}</h3>
-      <p className="muted">
-        Limits and feature flags change only here. No action, tool call or chat message can reach them (ST6).
-      </p>
+      <CardTitle
+        icon="settings"
+        title={t('settings.title')}
+        sub="Limits and feature flags change only here. No action, tool call or chat message can reach them (ST6)."
+      />
+      <div className="settings-flags">
+        <span className="muted small">Per-action cap</span>
+        <strong>{settings ? formatRupiah(settings.perActionCap) : '—'}</strong>
+        <span className="muted small">Simulated T3</span>
+        <span className={`pill ${settings?.featureFlags.simT3 ? 'pill-warn' : ''}`}>
+          {settings?.featureFlags.simT3 ? 'on' : 'off'}
+        </span>
+      </div>
       <form onSubmit={(event) => void save(event)}>
-        <label className="field">
-          <span>App PIN</span>
-          <input
-            type="password"
-            value={pin}
-            inputMode="numeric"
-            autoComplete="off"
-            data-testid="settings-pin"
-            onChange={(event) => setPin(event.target.value)}
-          />
-        </label>
-        <label className="field">
-          <span>Per-action cap</span>
-          <input
-            value={cap}
-            inputMode="numeric"
-            placeholder={String(settings?.perActionCap ?? '')}
-            data-testid="settings-cap"
-            onChange={(event) => setCap(event.target.value)}
-          />
-        </label>
+        <div className="field-row">
+          <label className="field">
+            <span>App PIN</span>
+            <input
+              type="password"
+              value={pin}
+              inputMode="numeric"
+              autoComplete="off"
+              data-testid="settings-pin"
+              onChange={(event) => setPin(event.target.value)}
+            />
+          </label>
+          <label className="field">
+            <span>Per-action cap</span>
+            <input
+              value={cap}
+              inputMode="numeric"
+              placeholder={String(settings?.perActionCap ?? '')}
+              data-testid="settings-cap"
+              onChange={(event) => setCap(event.target.value)}
+            />
+          </label>
+        </div>
         <div className="actions">
-          <button type="submit" data-testid="settings-save">
+          <button type="submit" className="primary" data-testid="settings-save">
             Save limits
           </button>
           <button type="button" data-testid="settings-toggle-simt3" onClick={() => void toggleSimulation()}>
@@ -913,6 +1065,205 @@ function SettingsPanel({ settings, onChanged }: { settings: Settings | null; onC
 
 /* --------------------------------------------------------------- app shell */
 
+type SectionId = 'overview' | 'assistant' | 'coverage' | 'money' | 'trust';
+
+const SECTIONS: Array<{ id: SectionId; icon: IconName; label: StringKey; sub: StringKey }> = [
+  { id: 'overview', icon: 'overview', label: 'nav.overview', sub: 'section.overviewSub' },
+  { id: 'assistant', icon: 'chat', label: 'nav.assistant', sub: 'section.assistantSub' },
+  { id: 'coverage', icon: 'shield', label: 'nav.coverage', sub: 'section.coverageSub' },
+  { id: 'money', icon: 'wallet', label: 'nav.money', sub: 'section.moneySub' },
+  { id: 'trust', icon: 'lock', label: 'nav.trust', sub: 'section.trustSub' },
+];
+
+/** The section nearest the top of the viewport, for the sidebar highlight. */
+function useActiveSection(enabled: boolean): SectionId {
+  const [active, setActive] = useState<SectionId>('overview');
+  useEffect(() => {
+    if (!enabled || typeof IntersectionObserver === 'undefined') return;
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((entry) => entry.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActive(visible[0].target.id as SectionId);
+      },
+      { rootMargin: '-20% 0px -65% 0px' },
+    );
+    for (const section of SECTIONS) {
+      const element = document.getElementById(section.id);
+      if (element) observer.observe(element);
+    }
+    return () => observer.disconnect();
+  }, [enabled]);
+  return active;
+}
+
+function Brand() {
+  const t = useT();
+  return (
+    <div className="brand">
+      <span className="brand-mark" aria-hidden="true">
+        W
+      </span>
+      <span className="brand-text">
+        <strong>{t('app.brand')}</strong>
+        <span>{t('app.brandSub')}</span>
+      </span>
+    </div>
+  );
+}
+
+function Sidebar({ active, badges }: { active: SectionId; badges: Partial<Record<SectionId, number>> }) {
+  const t = useT();
+  return (
+    <aside className="sidebar">
+      <Brand />
+      <nav aria-label={t('nav.label')}>
+        <ul className="nav">
+          {SECTIONS.map((section) => (
+            <li key={section.id}>
+              <a
+                href={`#${section.id}`}
+                className={active === section.id ? 'nav-link is-active' : 'nav-link'}
+                aria-current={active === section.id ? 'location' : undefined}
+              >
+                <Icon name={section.icon} />
+                <span>{t(section.label)}</span>
+                {badges[section.id] ? (
+                  <span className="nav-badge" aria-label={`${badges[section.id]} ${t('approval.waiting')}`}>
+                    {badges[section.id]}
+                  </span>
+                ) : null}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </nav>
+      <div className="sidebar-foot">
+        <p>
+          <Icon name="lock" size={14} /> {t('app.localFirst')}
+        </p>
+        <p>
+          <Icon name="shield" size={14} /> {t('app.noRealMoney')}
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function Topbar({ onLoadSeed }: { onLoadSeed: () => void }) {
+  const t = useT();
+  const { state } = useAppStateContext();
+  const { language, setLanguage } = useContext(LanguageContext);
+  const { theme, toggle } = useTheme();
+  const themeLabel = theme === 'dark' ? t('app.themeLight') : t('app.themeDark');
+  return (
+    <header className="topbar">
+      <div className="topbar-left">
+        {state.loaded ? null : <Brand />}
+        {state.snapshot ? (
+          <span className="chip-status">
+            <span className="dot" aria-hidden="true" />
+            {t('app.asOf')} {state.snapshot.asOf}
+          </span>
+        ) : null}
+        <span className="topbar-tagline muted small">{t('app.tagline')}</span>
+      </div>
+      <div className="actions">
+        <button
+          type="button"
+          className="icon-button"
+          aria-label={themeLabel}
+          title={themeLabel}
+          onClick={toggle}
+        >
+          <Icon name={theme === 'dark' ? 'sun' : 'moon'} />
+        </button>
+        <button
+          type="button"
+          data-testid="language-toggle"
+          onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}
+        >
+          <Icon name="globe" size={16} />
+          <span className="btn-label">{t('app.language')}</span>
+        </button>
+        <button type="button" className="primary" data-testid="load-seed" onClick={onLoadSeed}>
+          <Icon name={state.loaded ? 'refresh' : 'sparkle'} size={16} />
+          <span className="btn-label">{state.loaded ? t('app.resetSeed') : t('app.loadSeed')}</span>
+        </button>
+      </div>
+    </header>
+  );
+}
+
+const PROMISES: Array<{ icon: IconName; title: StringKey; body: StringKey }> = [
+  { icon: 'lock', title: 'landing.p1Title', body: 'landing.p1Body' },
+  { icon: 'shield', title: 'landing.p2Title', body: 'landing.p2Body' },
+  { icon: 'log', title: 'landing.p3Title', body: 'landing.p3Body' },
+];
+
+const TIERS: Array<{ tier: string; text: StringKey }> = [
+  { tier: 'T1', text: 'landing.t1' },
+  { tier: 'T2', text: 'landing.t2' },
+  { tier: 'T3', text: 'landing.t3' },
+];
+
+function Landing({ onLoadSeed }: { onLoadSeed: () => void }) {
+  const t = useT();
+  return (
+    <section className="landing" data-testid="empty-state">
+      <div className="landing-hero">
+        <p className="eyebrow">{t('landing.eyebrow')}</p>
+        <p className="landing-title">{t('landing.title')}</p>
+        <h2>{t('app.emptyTitle')}</h2>
+        <p className="landing-body">{t('app.emptyBody')}</p>
+        <div className="actions">
+          <button type="button" className="primary large" data-testid="load-seed-hero" onClick={onLoadSeed}>
+            <Icon name="sparkle" size={18} />
+            {t('landing.cta')}
+          </button>
+        </div>
+        <p className="muted small">{t('landing.ctaNote')}</p>
+      </div>
+      <ul className="promises">
+        {PROMISES.map((promise) => (
+          <li key={promise.title} className="card promise">
+            <span className="card-icon" aria-hidden="true">
+              <Icon name={promise.icon} />
+            </span>
+            <strong>{t(promise.title)}</strong>
+            <p className="muted small">{t(promise.body)}</p>
+          </li>
+        ))}
+      </ul>
+      <div className="card tiers">
+        <strong>{t('landing.tiersTitle')}</strong>
+        <ol>
+          {TIERS.map((item) => (
+            <li key={item.tier}>
+              <span className={`tier tier-${item.tier.toLowerCase()}`}>{item.tier}</span> {t(item.text)}
+            </li>
+          ))}
+        </ol>
+      </div>
+    </section>
+  );
+}
+
+function Section({ id, children }: { id: SectionId; children: ReactNode }) {
+  const t = useT();
+  const section = SECTIONS.find((candidate) => candidate.id === id)!;
+  return (
+    <section id={id} className="section" aria-labelledby={`${id}-heading`}>
+      <header className="section-head">
+        <h2 id={`${id}-heading`}>{t(section.label)}</h2>
+        <p className="muted">{t(section.sub)}</p>
+      </header>
+      {children}
+    </section>
+  );
+}
+
 export function App() {
   const t = useT();
   const services = useServices();
@@ -921,7 +1272,7 @@ export function App() {
   const [earmarkNotice, setEarmarkNotice] = useState<string | null>(null);
   const [conversation, setConversation] = useState(0);
   const pendingGroups = groupByRisk(state.pending);
-  const { language, setLanguage } = useContext(LanguageContext);
+  const active = useActiveSection(state.loaded);
 
   const loadSeed = async () => {
     setLoadNotice(null);
@@ -952,107 +1303,116 @@ export function App() {
   };
 
   return (
-    <main className="app">
-      <header className="app-header">
-        <div>
-          <h1>{t('app.title')}</h1>
-          <p className="muted">{t('app.tagline')}</p>
-        </div>
-        <div className="actions">
-          <button type="button" className="primary" data-testid="load-seed" onClick={() => void loadSeed()}>
-            {state.loaded ? t('app.resetSeed') : t('app.loadSeed')}
-          </button>
-          <button
-            type="button"
-            data-testid="language-toggle"
-            onClick={() => setLanguage(language === 'en' ? 'id' : 'en')}
-          >
-            {t('app.language')}
-          </button>
-        </div>
-      </header>
-
-      {loadNotice ? (
-        <p className="warning" role="alert" data-testid="load-notice">
-          {loadNotice}
-        </p>
+    <div className={state.loaded ? 'shell' : 'shell shell-landing'}>
+      {state.loaded ? (
+        <Sidebar
+          active={active}
+          badges={{ assistant: state.pending.length, coverage: state.policies.length }}
+        />
       ) : null}
 
-      {!state.loaded ? (
-        <section className="card empty-state" data-testid="empty-state">
-          <h2>{t('app.emptyTitle')}</h2>
-          <p>{t('app.emptyBody')}</p>
-        </section>
-      ) : (
-        <>
-          {/* DASH-1: runway, policy coverage and the audit log on one screen. */}
-          <div className="dashboard">
-            <div className="column">
-              {state.snapshot ? (
-                <BalancesPanel
-                  snapshot={state.snapshot}
-                  staleness={state.staleness}
-                  accounts={state.accountTypes}
+      <div className="main">
+        <Topbar onLoadSeed={() => void loadSeed()} />
+        <main className="app">
+          <h1 className="visually-hidden">{t('app.title')}</h1>
+
+          {loadNotice ? (
+            <p className="warning" role="alert" data-testid="load-notice">
+              {loadNotice}
+            </p>
+          ) : null}
+
+          {!state.loaded ? (
+            <Landing onLoadSeed={() => void loadSeed()} />
+          ) : (
+            <>
+              {/* DASH-1: runway, policy coverage and the audit log on one page. */}
+              <Section id="overview">
+                {state.snapshot ? (
+                  <BalancesPanel snapshot={state.snapshot} staleness={state.staleness} />
+                ) : null}
+                <div className="split split-wide">
+                  {state.forecast ? <RunwayPanel view={state.forecast} /> : null}
+                  {state.snapshot ? (
+                    <AccountsPanel snapshot={state.snapshot} accounts={state.accountTypes} />
+                  ) : null}
+                </div>
+              </Section>
+
+              <Section id="assistant">
+                <div className="split split-chat">
+                  <ChatPanel key={conversation} onChanged={reload} />
+                  {/* Approvals sit beside the chat (above it on a phone), so a new card is never out of sight. */}
+                  <section
+                    id="approvals"
+                    className="approvals"
+                    data-testid="approvals"
+                    aria-label="Approvals"
+                  >
+                    <div className="approvals-head">
+                      <h3>{t('approval.queue')}</h3>
+                      <span className={state.pending.length > 0 ? 'pill pill-warn' : 'pill'}>
+                        {state.pending.length} {t('approval.waiting')}
+                      </span>
+                    </div>
+                    {state.pending.length > 0 ? (
+                      <div className="pending" data-testid="pending-list">
+                        {pendingGroups.individual.map((proposal) => (
+                          <ApprovalCard key={proposal.proposalId} proposal={proposal} onChanged={reload} />
+                        ))}
+                        {pendingGroups.lowRisk.length > 0 ? (
+                          <LowRiskGroupCard
+                            key={pendingGroups.lowRisk.map((proposal) => proposal.proposalId).join('+')}
+                            proposals={pendingGroups.lowRisk}
+                            onChanged={reload}
+                          />
+                        ) : null}
+                      </div>
+                    ) : (
+                      <div className="card empty-card muted" data-testid="no-pending">
+                        <Icon name="check" size={22} />
+                        <span>{t('approval.none')}</span>
+                      </div>
+                    )}
+                  </section>
+                </div>
+              </Section>
+
+              <Section id="coverage">
+                {state.snapshot ? (
+                  <PolicyPanel policies={state.policies} snapshot={state.snapshot} onChanged={reload} />
+                ) : null}
+              </Section>
+
+              <Section id="money">
+                <div className="grid">
+                  <StatementImportPanel onChanged={reload} />
+                  <EarmarkForm onChanged={reload} />
+                </div>
+                <EarmarksPanel
+                  earmarks={state.earmarks}
+                  notice={earmarkNotice}
+                  onNotice={(message) => {
+                    setEarmarkNotice(message);
+                    reload();
+                  }}
+                  onRelease={(id) => void releaseEarmark(id)}
                 />
-              ) : null}
-              {state.forecast ? <RunwayPanel view={state.forecast} /> : null}
-            </div>
+              </Section>
 
-            <div className="column">
-              {/* Approvals sit above the chat, so a new card is never below the fold. */}
-              <section id="approvals" data-testid="approvals" aria-label="Approvals">
-                {state.pending.length > 0 ? (
-                  <div className="pending" data-testid="pending-list">
-                    {pendingGroups.individual.map((proposal) => (
-                      <ApprovalCard key={proposal.proposalId} proposal={proposal} onChanged={reload} />
-                    ))}
-                    {pendingGroups.lowRisk.length > 0 ? (
-                      <LowRiskGroupCard
-                        key={pendingGroups.lowRisk.map((proposal) => proposal.proposalId).join('+')}
-                        proposals={pendingGroups.lowRisk}
-                        onChanged={reload}
-                      />
-                    ) : null}
-                  </div>
-                ) : (
-                  <div className="card muted" data-testid="no-pending">
-                    {t('approval.none')}
-                  </div>
-                )}
-              </section>
-              <ChatPanel key={conversation} onChanged={reload} />
-            </div>
+              <Section id="trust">
+                <AuditPanel onChanged={reload} />
+                <div className="grid">
+                  <PrivacyPanel outbound={state.outbound} onChanged={reload} />
+                  <SettingsPanel settings={state.settings} onChanged={reload} />
+                </div>
+              </Section>
+            </>
+          )}
 
-            <div className="column">
-              {state.snapshot ? (
-                <PolicyPanel policies={state.policies} snapshot={state.snapshot} onChanged={reload} />
-              ) : null}
-              <AuditPanel onChanged={reload} />
-            </div>
-          </div>
-
-          <div className="grid">
-            <StatementImportPanel onChanged={reload} />
-            <EarmarkForm onChanged={reload} />
-            <EarmarksPanel
-              earmarks={state.earmarks}
-              notice={earmarkNotice}
-              onNotice={(message) => {
-                setEarmarkNotice(message);
-                reload();
-              }}
-              onRelease={(id) => void releaseEarmark(id)}
-            />
-          </div>
-
-          <div className="grid">
-            <PrivacyPanel outbound={state.outbound} onChanged={reload} />
-            <SettingsPanel settings={state.settings} onChanged={reload} />
-          </div>
-        </>
-      )}
-
-      {loading ? <p className="muted">Loading…</p> : null}
-    </main>
+          {loading ? <p className="muted">Loading…</p> : null}
+        </main>
+      </div>
+    </div>
   );
 }

@@ -7,5 +7,10 @@ export default defineConfig({
   // built with VITE_MODEL=relay; the default build never calls it.
   server: { port: 5173, strictPort: true, proxy: { '/api': 'http://localhost:8787' } },
   preview: { port: 4173, strictPort: true, proxy: { '/api': 'http://localhost:8787' } },
-  build: { target: 'es2022', sourcemap: true },
+  build: {
+    target: 'es2022',
+    sourcemap: true,
+    // The CSP allows fonts from 'self' only, so a font is never inlined as a data: URL.
+    assetsInlineLimit: (filePath) => (/\.woff2?$/.test(filePath) ? false : undefined),
+  },
 });

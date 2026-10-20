@@ -12,15 +12,17 @@ npm ls --all --json > licences.json   # or inspect node_modules/*/package.json
 
 ## Direct dependencies
 
-| Package             | Version | Licence    | Why it is here                             |
-| ------------------- | ------- | ---------- | ------------------------------------------ |
-| `@hono/node-server` | 2.1.4   | MIT        | Local dev server for the relay function    |
-| `dexie`             | 4.4.6   | Apache-2.0 | IndexedDB wrapper for browser-only storage |
-| `hono`              | 4.13.13 | MIT        | The one serverless relay function          |
-| `pdfjs-dist`        | 6.4.299 | Apache-2.0 | Reads the text layer of policy PDFs        |
-| `react`             | 19.3.0  | MIT        | UI                                         |
-| `react-dom`         | 19.3.0  | MIT        | UI                                         |
-| `zod`               | 4.6.7   | MIT        | Schemas and validation for every entity    |
+| Package                        | Version | Licence    | Why it is here                                              |
+| ------------------------------ | ------- | ---------- | ----------------------------------------------------------- |
+| `@fontsource-variable/inter`   | 5.3.0   | OFL-1.1    | UI typeface, self-hosted so the CSP stays `font-src 'self'` |
+| `@fontsource-variable/manrope` | 5.3.0   | OFL-1.1    | Display typeface for headings and figures, self-hosted      |
+| `@hono/node-server`            | 2.1.4   | MIT        | Local dev server for the relay function                     |
+| `dexie`                        | 4.4.6   | Apache-2.0 | IndexedDB wrapper for browser-only storage                  |
+| `hono`                         | 4.13.13 | MIT        | The one serverless relay function                           |
+| `pdfjs-dist`                   | 6.4.299 | Apache-2.0 | Reads the text layer of policy PDFs                         |
+| `react`                        | 19.3.0  | MIT        | UI                                                          |
+| `react-dom`                    | 19.3.0  | MIT        | UI                                                          |
+| `zod`                          | 4.6.7   | MIT        | Schemas and validation for every entity                     |
 
 ## Direct dev dependencies
 
@@ -66,6 +68,7 @@ differs slightly by platform because native binaries are per-platform. Licence c
 | CC0-1.0       | 1        |
 | CC-BY-4.0     | 1        |
 | Python-2.0    | 1        |
+| OFL-1.1       | 2        |
 
 Notes on the entries that are not MIT, Apache, ISC or BSD:
 
@@ -79,10 +82,13 @@ Notes on the entries that are not MIT, Apache, ISC or BSD:
   and utility packages, also unmodified and not redistributed.
 - `@napi-rs/canvas` (MIT) is an optional dependency of `pdfjs-dist` for rendering pages in
   Node. This project only reads text, never renders, and it is not part of the built site.
+- `@fontsource-variable/inter` and `@fontsource-variable/manrope` (SIL OFL-1.1) are font
+  files bundled unmodified into the built site and served from this origin. The OFL allows
+  bundling and redistribution with software; the licence text ships inside each package.
 - There is **no GPL or AGPL code anywhere in the dependency tree.**
 
 `pdfjs-dist` is the only third-party code that ships in the built site besides React,
-Dexie and Zod. It is loaded from this origin, on demand, when a policy PDF is opened.
+Dexie and Zod (the two typefaces ship as font files, not code). It is loaded from this origin, on demand, when a policy PDF is opened.
 
 ## Platform components (no dependency, no licence to record)
 

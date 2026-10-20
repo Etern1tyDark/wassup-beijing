@@ -24,6 +24,81 @@ const STRINGS = {
     id: 'Muat data contoh untuk persona demo agar saldo, daya tahan kas, cakupan polis dan log audit tampil.',
   },
   'app.language': { en: 'Bahasa Indonesia', id: 'English' },
+  'app.brand': { en: 'Wassup Ledger', id: 'Wassup Ledger' },
+  'app.brandSub': { en: 'Permissioned finance agent', id: 'Agen keuangan berizin' },
+  'app.asOf': { en: 'As of', id: 'Per' },
+  'app.localFirst': { en: 'Ledger stays on this device', id: 'Buku kas tetap di perangkat ini' },
+  'app.noRealMoney': { en: 'No real money moves', id: 'Tidak ada uang sungguhan yang berpindah' },
+  'app.themeDark': { en: 'Switch to dark theme', id: 'Ganti ke tema gelap' },
+  'app.themeLight': { en: 'Switch to light theme', id: 'Ganti ke tema terang' },
+
+  'nav.label': { en: 'Sections', id: 'Bagian' },
+  'nav.overview': { en: 'Overview', id: 'Ringkasan' },
+  'nav.assistant': { en: 'Assistant', id: 'Asisten' },
+  'nav.coverage': { en: 'Insurance', id: 'Asuransi' },
+  'nav.money': { en: 'Cash moves', id: 'Arus kas' },
+  'nav.trust': { en: 'Trust & control', id: 'Kepercayaan & kendali' },
+
+  'section.overviewSub': {
+    en: 'What you can spend, how long it lasts, and where it sits.',
+    id: 'Berapa yang bisa dibelanjakan, berapa lama bertahan, dan di mana disimpan.',
+  },
+  'section.assistantSub': {
+    en: 'The agent proposes. Nothing changes until you approve the card.',
+    id: 'Agen mengusulkan. Tidak ada yang berubah sampai Anda menyetujui kartunya.',
+  },
+  'section.coverageSub': {
+    en: 'What a policy pays, read clause by clause, with the source quoted.',
+    id: 'Apa yang dibayar polis, dibaca per klausul, dengan sumber dikutip.',
+  },
+  'section.moneySub': {
+    en: 'Bring in a statement and set money aside. Both go through approval.',
+    id: 'Impor mutasi dan sisihkan dana. Keduanya melalui persetujuan.',
+  },
+  'section.trustSub': {
+    en: 'Every action in a hash-chained log, every outbound request in the open.',
+    id: 'Setiap aksi di log berantai hash, setiap permintaan keluar terlihat.',
+  },
+
+  'landing.eyebrow': { en: 'FinTechathon 2026 · local-first demo', id: 'FinTechathon 2026 · demo lokal' },
+  'landing.title': {
+    en: 'A finance agent that asks before it acts.',
+    id: 'Agen keuangan yang bertanya sebelum bertindak.',
+  },
+  'landing.cta': { en: 'Explore with demo data', id: 'Jelajahi dengan data contoh' },
+  'landing.ctaNote': {
+    en: 'Synthetic data for the persona Rina. No account, no API key, no network.',
+    id: 'Data sintetis untuk persona Rina. Tanpa akun, tanpa kunci API, tanpa jaringan.',
+  },
+  'landing.p1Title': { en: 'Stays on your device', id: 'Tetap di perangkat Anda' },
+  'landing.p1Body': {
+    en: 'The ledger lives in this browser. Only redacted text ever leaves, and you see every byte.',
+    id: 'Buku kas ada di peramban ini. Hanya teks yang disamarkan yang keluar, dan Anda melihat setiap bitnya.',
+  },
+  'landing.p2Title': { en: 'You approve every change', id: 'Anda menyetujui setiap perubahan' },
+  'landing.p2Body': {
+    en: 'Each action is tiered, checked against guardrails and shown as a before-and-after card.',
+    id: 'Setiap aksi diberi tingkat, diperiksa pagar pengaman dan ditampilkan sebagai kartu sebelum-sesudah.',
+  },
+  'landing.p3Title': { en: 'Logged and reversible', id: 'Tercatat dan bisa dibatalkan' },
+  'landing.p3Body': {
+    en: 'An append-only, hash-chained audit log you can verify, export and undo from.',
+    id: 'Log audit berantai hash yang hanya bisa ditambah, bisa diverifikasi, diekspor dan dibatalkan.',
+  },
+  'landing.tiersTitle': { en: 'Three permission tiers', id: 'Tiga tingkat izin' },
+  'landing.t1': { en: 'Read and explain. Runs freely.', id: 'Membaca dan menjelaskan. Berjalan bebas.' },
+  'landing.t2': {
+    en: 'Reversible ledger changes. Needs your Approve.',
+    id: 'Perubahan buku kas yang bisa dibatalkan. Butuh persetujuan Anda.',
+  },
+  'landing.t3': {
+    en: 'Money movement. Simulated only, behind a PIN.',
+    id: 'Perpindahan uang. Hanya simulasi, dengan PIN.',
+  },
+
+  'approval.queue': { en: 'Approvals', id: 'Persetujuan' },
+  'approval.waiting': { en: 'waiting', id: 'menunggu' },
+  'accounts.title': { en: 'Accounts', id: 'Rekening' },
 
   'balances.title': { en: 'Balances · as of', id: 'Saldo · per' },
   'balances.safeToSpend': { en: 'Safe to spend', id: 'Aman dibelanjakan' },

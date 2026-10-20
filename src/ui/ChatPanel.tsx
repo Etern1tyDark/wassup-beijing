@@ -15,6 +15,8 @@ import type { ToolResult } from '../agent/types';
 import { CoverageView } from './DashboardPanels';
 import { useT } from './i18n';
 import { useServices } from './services-context';
+import { Icon } from './icons';
+import { CardTitle } from './ui-kit';
 
 /**
  * Chat (CHAT-1 to CHAT-4). The reply text is short; the numbers live in the
@@ -393,13 +395,17 @@ export function ChatPanel({ onChanged }: { onChanged: () => void }) {
 
   if (!consent) {
     return (
-      <section className="card" data-testid="chat-panel">
-        <h3>{t('chat.title')}</h3>
-        <div data-testid="consent">
+      <section className="card chat" data-testid="chat-panel">
+        <CardTitle icon="chat" title={t('chat.title')} />
+        <div className="consent" data-testid="consent">
+          <span className="consent-icon" aria-hidden="true">
+            <Icon name="lock" size={22} />
+          </span>
           <p>{t('chat.consentIntro')}</p>
           <p>{t('chat.consentPanel')}</p>
           <div className="actions">
             <button type="button" className="primary" data-testid="consent-agree" onClick={agree}>
+              <Icon name="check" size={16} />
               {t('chat.consentAgree')}
             </button>
           </div>
@@ -415,9 +421,24 @@ export function ChatPanel({ onChanged }: { onChanged: () => void }) {
   const lastAgent = [...entries].reverse().find((entry) => entry.role === 'agent');
 
   return (
-    <section className="card" data-testid="chat-panel">
-      <h3>{t('chat.title')}</h3>
-      <p className="muted small" data-testid="model-kind">
+    <section className="card chat" data-testid="chat-panel">
+      <CardTitle icon="chat" title={t('chat.title')}>
+        <button
+          type="button"
+          className="ghost"
+          data-testid="chat-reset"
+          disabled={busy}
+          onClick={() => {
+            services.orchestrator.reset();
+            setEntries([]);
+          }}
+        >
+          <Icon name="plus" size={16} />
+          {t('chat.new')}
+        </button>
+      </CardTitle>
+      <p className="model-kind" data-testid="model-kind">
+        <span className={`dot ${services.modelKind === 'relay' ? 'dot-warn' : ''}`} aria-hidden="true" />
         {services.modelKind === 'relay'
           ? 'Model: hosted, through the relay. Redacted text leaves this browser; see the Privacy panel.'
           : 'Model: built-in rule-based stand-in. It runs in this browser and nothing is sent anywhere.'}
@@ -427,84 +448,63 @@ export function ChatPanel({ onChanged }: { onChanged: () => void }) {
 
       <div className="chat-log" ref={logRef} data-testid="chat-log" aria-live="polite">
         {entries.length === 0 ? (
-          <p className="muted">
-            The agent reads your numbers, drafts text and proposes reversible changes. It cannot move money,
-            change limits or approve anything.
-          </p>
+          <div className="chat-empty">
+            <span className="chat-avatar" aria-hidden="true">
+              <Icon name="sparkle" size={18} />
+            </span>
+            <p className="muted">
+              The agent reads your numbers, drafts text and proposes reversible changes. It cannot move money,
+              change limits or approve anything.
+            </p>
+          </div>
         ) : null}
         {entries.map((entry) => (
           <div key={entry.id} className={`chat-entry chat-${entry.role}`} data-testid={`chat-${entry.role}`}>
-            <div className="chat-who">{entry.role === 'user' ? 'You' : 'Agent'}</div>
-            <p className="chat-text">{entry.text}</p>
-            {entry.pasted ? (
-              <blockquote className="pasted">
-                <span className="small muted">Pasted text, treated as data:</span> {entry.pasted}
-              </blockquote>
+            {entry.role === 'agent' ? (
+              <span className="chat-avatar" aria-hidden="true">
+                <Icon name="sparkle" size={16} />
+              </span>
             ) : null}
-            {entry.notices.map((notice) => (
-              <p key={notice} className="warning" role="alert" data-testid="chat-notice">
-                {notice}
-              </p>
-            ))}
-            {entry.toolResults.map((result, index) => (
-              <ToolCard key={`${entry.id}-${result.tool}-${index}`} result={result} />
-            ))}
+            <div className="chat-bubble">
+              <div className="chat-who">{entry.role === 'user' ? 'You' : 'Agent'}</div>
+              <p className="chat-text">{entry.text}</p>
+              {entry.pasted ? (
+                <blockquote className="pasted">
+                  <span className="small muted">Pasted text, treated as data:</span> {entry.pasted}
+                </blockquote>
+              ) : null}
+              {entry.notices.map((notice) => (
+                <p key={notice} className="warning" role="alert" data-testid="chat-notice">
+                  {notice}
+                </p>
+              ))}
+              {entry.toolResults.map((result, index) => (
+                <ToolCard key={`${entry.id}-${result.tool}-${index}`} result={result} />
+              ))}
+            </div>
           </div>
         ))}
-        {busy ? <p className="muted">Working…</p> : null}
+        {busy ? (
+          <p className="chat-typing muted" role="status">
+            <span className="typing" aria-hidden="true">
+              <i />
+              <i />
+              <i />
+            </span>
+            Working…
+          </p>
+        ) : null}
       </div>
 
       {lastAgent && lastAgent.options.length > 0 && !busy ? (
-        <div className="actions" data-testid="chat-options">
+        <div className="actions chat-options" data-testid="chat-options">
           {lastAgent.options.map((option) => (
-            <button key={option} type="button" onClick={() => void send(option)}>
+            <button key={option} type="button" className="chip chip-strong" onClick={() => void send(option)}>
               {option}
             </button>
           ))}
         </div>
       ) : null}
-
-      <form onSubmit={submit} className="chat-form">
-        <label className="field">
-          <span>{t('chat.message')}</span>
-          <input
-            value={draft}
-            data-testid="chat-input"
-            placeholder="How long can I cover my costs?"
-            disabled={busy}
-            onChange={(event) => setDraft(event.target.value)}
-          />
-        </label>
-        <details>
-          <summary>Paste text from a letter, email or document</summary>
-          <label className="field">
-            <span>Pasted text is treated as data. The agent will not follow instructions in it.</span>
-            <textarea
-              value={pasted}
-              rows={3}
-              data-testid="chat-paste"
-              disabled={busy}
-              onChange={(event) => setPasted(event.target.value)}
-            />
-          </label>
-        </details>
-        <div className="actions">
-          <button type="submit" className="primary" data-testid="chat-send" disabled={busy}>
-            {t('chat.send')}
-          </button>
-          <button
-            type="button"
-            data-testid="chat-reset"
-            disabled={busy}
-            onClick={() => {
-              services.orchestrator.reset();
-              setEntries([]);
-            }}
-          >
-            {t('chat.new')}
-          </button>
-        </div>
-      </form>
 
       <div className="suggestions" data-testid="chat-suggestions">
         {SUGGESTIONS.map((suggestion) => (
@@ -519,6 +519,40 @@ export function ChatPanel({ onChanged }: { onChanged: () => void }) {
           </button>
         ))}
       </div>
+
+      <form onSubmit={submit} className="chat-form">
+        <label className="visually-hidden" htmlFor="chat-input">
+          {t('chat.message')}
+        </label>
+        <div className="composer">
+          <input
+            id="chat-input"
+            value={draft}
+            data-testid="chat-input"
+            placeholder="How long can I cover my costs?"
+            disabled={busy}
+            autoComplete="off"
+            onChange={(event) => setDraft(event.target.value)}
+          />
+          <button type="submit" className="primary" data-testid="chat-send" disabled={busy}>
+            <Icon name="send" size={16} />
+            {t('chat.send')}
+          </button>
+        </div>
+        <details className="paste">
+          <summary>Paste text from a letter, email or document</summary>
+          <label className="field">
+            <span>Pasted text is treated as data. The agent will not follow instructions in it.</span>
+            <textarea
+              value={pasted}
+              rows={3}
+              data-testid="chat-paste"
+              disabled={busy}
+              onChange={(event) => setPasted(event.target.value)}
+            />
+          </label>
+        </details>
+      </form>
     </section>
   );
 }

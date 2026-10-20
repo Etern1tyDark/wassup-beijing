@@ -1,5 +1,5 @@
-import { useMemo, useState, type ChangeEvent } from 'react';
-import { formatRupiah, toMoney } from '../domain/money';
+import { useId, useMemo, useState, type ChangeEvent, type PointerEvent } from 'react';
+import { formatRupiah, formatRupiahCompact, toMoney } from '../domain/money';
 import type { LedgerSnapshot } from '../ledger/engine';
 import { FORECAST_HORIZON_DAYS, type ForecastResult } from '../forecast';
 import {
@@ -15,34 +15,122 @@ import { prepareStatementImport, type PreparedStatement } from '../importers/sta
 import type { ForecastView } from './app-state';
 import { useT } from './i18n';
 import { useServices } from './services-context';
+import { Icon } from './icons';
+import { CardTitle } from './ui-kit';
 
 /* ------------------------------------------------------------------ runway */
 
-/** The 90-day free-cash line as an inline SVG. The numbers beside it carry the meaning. */
+/**
+ * The 90-day free-cash line as an inline SVG area chart. The SVG stretches to
+ * its box, so labels, the lowest-point marker and the hover readout are HTML
+ * placed in percentages over it and never distort. The numbers beside the
+ * chart carry the meaning; the chart only shows the shape.
+ */
 function ForecastChart({ forecast }: { forecast: ForecastResult }) {
-  const width = 320;
-  const height = 80;
-  const values = forecast.points.map((point) => point.freeCash);
+  const gradientId = useId();
+  const [hover, setHover] = useState<number | null>(null);
+  const width = 640;
+  const height = 180;
+  const points = forecast.points;
+  const values = points.map((point) => point.freeCash);
   const max = Math.max(0, ...values);
   const min = Math.min(0, ...values);
   const span = max - min || 1;
-  const x = (index: number): number => (index / (forecast.points.length - 1)) * width;
+  const last = Math.max(1, points.length - 1);
+  const x = (index: number): number => (index / last) * width;
   const y = (value: number): number => height - ((value - min) / span) * height;
-  const path = forecast.points
+  const line = points
     .map((point, index) => `${index === 0 ? 'M' : 'L'}${x(index).toFixed(1)},${y(point.freeCash).toFixed(1)}`)
     .join(' ');
+  const area = `${line} L${width},${y(min).toFixed(1)} L0,${y(min).toFixed(1)} Z`;
+  const lowestIndex = Math.max(
+    0,
+    points.findIndex((point) => point.date === forecast.lowestFreeCash.date),
+  );
+  const percentX = (index: number): string => `${(index / last) * 100}%`;
+  const percentY = (value: number): string => `${(y(value) / height) * 100}%`;
+  const ticks = [0, Math.round(last / 3), Math.round((2 * last) / 3), last];
+  const hovered = hover === null ? null : points[hover];
+
+  const track = (event: PointerEvent<HTMLDivElement>) => {
+    const box = event.currentTarget.getBoundingClientRect();
+    if (box.width === 0) return;
+    const ratio = Math.min(1, Math.max(0, (event.clientX - box.left) / box.width));
+    setHover(Math.round(ratio * last));
+  };
 
   return (
-    <svg
-      className="forecast-chart"
-      viewBox={`0 0 ${width} ${height}`}
-      role="img"
-      aria-label={`Projected free cash for ${forecast.horizonDays} days: lowest ${formatRupiah(forecast.lowestFreeCash.amount)} on ${forecast.lowestFreeCash.date}`}
-      data-testid="forecast-chart"
-    >
-      <line x1="0" x2={width} y1={y(0)} y2={y(0)} className="forecast-zero" />
-      <path d={path} className="forecast-line" />
-    </svg>
+    <figure className="chart">
+      <div className="chart-y" aria-hidden="true">
+        <span>{formatRupiahCompact(toMoney(max))}</span>
+        <span>{formatRupiahCompact(toMoney(min))}</span>
+      </div>
+      <div className="chart-plot" onPointerMove={track} onPointerLeave={() => setHover(null)}>
+        <svg
+          className="forecast-chart"
+          viewBox={`0 0 ${width} ${height}`}
+          preserveAspectRatio="none"
+          role="img"
+          aria-label={`Projected free cash for ${forecast.horizonDays} days: lowest ${formatRupiah(forecast.lowestFreeCash.amount)} on ${forecast.lowestFreeCash.date}`}
+          data-testid="forecast-chart"
+        >
+          <defs>
+            <linearGradient id={gradientId} x1="0" x2="0" y1="0" y2="1">
+              <stop offset="0%" className="forecast-stop-top" />
+              <stop offset="100%" className="forecast-stop-bottom" />
+            </linearGradient>
+          </defs>
+          {[0.25, 0.5, 0.75].map((fraction) => (
+            <line
+              key={fraction}
+              x1="0"
+              x2={width}
+              y1={height * fraction}
+              y2={height * fraction}
+              className="forecast-grid"
+            />
+          ))}
+          <path d={area} fill={`url(#${gradientId})`} />
+          <line x1="0" x2={width} y1={y(0)} y2={y(0)} className="forecast-zero" />
+          <path d={line} className="forecast-line" />
+        </svg>
+        <span
+          className="chart-marker"
+          style={{ left: percentX(lowestIndex), top: percentY(forecast.lowestFreeCash.amount) }}
+          aria-hidden="true"
+        />
+        <span
+          className={`chart-marker-label ${lowestIndex > last * 0.8 ? 'chart-marker-label-end' : lowestIndex < last * 0.2 ? 'chart-marker-label-start' : ''}`}
+          style={{ left: percentX(lowestIndex), top: percentY(forecast.lowestFreeCash.amount) }}
+          aria-hidden="true"
+        >
+          Lowest {formatRupiahCompact(forecast.lowestFreeCash.amount)}
+        </span>
+        {hovered && hover !== null ? (
+          <>
+            <span className="chart-cursor" style={{ left: percentX(hover) }} aria-hidden="true" />
+            <span
+              className="chart-dot"
+              style={{ left: percentX(hover), top: percentY(hovered.freeCash) }}
+              aria-hidden="true"
+            />
+            <span
+              className={`chart-tip ${hover > last / 2 ? 'chart-tip-left' : ''}`}
+              style={{ left: percentX(hover) }}
+              aria-hidden="true"
+            >
+              <strong>{formatRupiah(hovered.freeCash)}</strong>
+              <span>{hovered.date}</span>
+            </span>
+          </>
+        ) : null}
+      </div>
+      <div className="chart-x" aria-hidden="true">
+        {ticks.map((tick) => (
+          <span key={tick}>{points[tick]?.date.slice(5)}</span>
+        ))}
+      </div>
+    </figure>
   );
 }
 
@@ -51,22 +139,41 @@ export function RunwayPanel({ view }: { view: ForecastView }) {
   const { forecast, runway, alerts } = view;
   const inputs = forecast.inputs;
   const counted = forecast.events.filter((event) => event.kind === 'invoice');
+  const tone =
+    runway.capped || runway.runwayDays >= 180 ? 'good' : runway.runwayDays >= 60 ? 'watch' : 'risk';
 
   return (
-    <section className="card" data-testid="runway-panel">
-      <h3>{t('runway.title')}</h3>
-      <dl className="totals">
+    <section className="card runway" data-testid="runway-panel">
+      <CardTitle
+        icon="sparkle"
+        title={t('runway.title')}
+        sub={`Free cash over the next ${forecast.horizonDays} days`}
+      >
+        <span className={`pill pill-${tone}`}>
+          {tone === 'good' ? 'Comfortable' : tone === 'watch' ? 'Watch' : 'Tight'}
+        </span>
+      </CardTitle>
+      <dl className="runway-figures">
         <div>
           <dt>{t('runway.covered')}</dt>
-          <dd data-testid="runway-days">
+          <dd className="figure-xl" data-testid="runway-days">
             {runway.capped ? `More than ${runway.runwayDays} days` : `${runway.runwayDays} days`}
           </dd>
         </div>
         <div>
           <dt>{t('runway.months')}</dt>
-          <dd data-testid="runway-months">{runway.capped ? '24+' : runway.runwayMonths}</dd>
+          <dd className="figure-lg" data-testid="runway-months">
+            {runway.capped ? '24+' : runway.runwayMonths}
+          </dd>
+        </div>
+        <div>
+          <dt>Lowest in {FORECAST_HORIZON_DAYS} days</dt>
+          <dd className="figure-lg">{formatRupiah(forecast.lowestFreeCash.amount)}</dd>
         </div>
       </dl>
+
+      <ForecastChart forecast={forecast} />
+
       <p className="muted small" data-testid="runway-detail">
         {runway.depletionDate
           ? `Free cash is projected to run out on ${runway.depletionDate}.`
@@ -75,13 +182,14 @@ export function RunwayPanel({ view }: { view: ForecastView }) {
         on {forecast.lowestFreeCash.date}.
       </p>
 
-      <ForecastChart forecast={forecast} />
-
       {alerts.length > 0 ? (
         <ul className="alerts" data-testid="alerts">
           {alerts.map((alert) => (
             <li key={alert.id} className={`alert alert-${alert.severity}`}>
-              <strong>{alert.severity === 'warning' ? 'Warning' : 'Note'}:</strong> {alert.message}
+              <Icon name="alert" size={16} />
+              <span>
+                <strong>{alert.severity === 'warning' ? 'Warning' : 'Note'}:</strong> {alert.message}
+              </span>
             </li>
           ))}
         </ul>
@@ -283,7 +391,8 @@ function PolicyCard({
     <article className="policy" data-testid={`policy-${policy.type}`}>
       <header className="card-header">
         <div>
-          <strong>{policy.displayName}</strong>
+          <span className="pill">{policy.type}</span>{' '}
+          <strong className="policy-name">{policy.displayName}</strong>
           {flagged.length > 0 ? (
             <span className="badge-danger" data-testid="policy-tampered-badge">
               Hidden instruction found
@@ -294,7 +403,7 @@ function PolicyCard({
             {policy.startDate ? `cover from ${policy.startDate}` : 'start date not stated'}
           </div>
         </div>
-        <button type="button" onClick={onRemove}>
+        <button type="button" className="ghost-danger" onClick={onRemove}>
           Remove
         </button>
       </header>
@@ -452,9 +561,14 @@ export function PolicyPanel({
 
   return (
     <section className="card" data-testid="policy-panel">
-      <h3>{t('policy.title')}</h3>
-      <div className="actions upload-row">
-        <label className="file-button">
+      <CardTitle
+        icon="shield"
+        title={t('policy.title')}
+        sub="Text-based PDFs up to 20 pages. The text is read in this browser; it is compared, never used to recommend a product."
+      />
+      <div className="upload-row">
+        <label className="dropzone">
+          <Icon name="upload" size={20} />
           <span>{t('policy.upload')}</span>
           <input
             type="file"
@@ -464,22 +578,22 @@ export function PolicyPanel({
             onChange={upload}
           />
         </label>
-        {SAMPLE_POLICIES.map((sample) => (
-          <button
-            key={sample.file}
-            type="button"
-            data-testid={sample.testId}
-            disabled={busy}
-            onClick={() => void loadSample(sample.file)}
-          >
-            {sample.label}
-          </button>
-        ))}
+        <div className="samples">
+          {SAMPLE_POLICIES.map((sample) => (
+            <button
+              key={sample.file}
+              type="button"
+              data-testid={sample.testId}
+              disabled={busy}
+              className={sample.file.includes('tampered') ? 'sample sample-attack' : 'sample'}
+              onClick={() => void loadSample(sample.file)}
+            >
+              <Icon name={sample.file.includes('tampered') ? 'alert' : 'file'} size={16} />
+              {sample.label}
+            </button>
+          ))}
+        </div>
       </div>
-      <p className="muted small">
-        Text-based PDFs up to 20 pages. The text is read in this browser; it is compared, never used to
-        recommend a product.
-      </p>
 
       {message ? (
         <p
@@ -496,14 +610,16 @@ export function PolicyPanel({
           {t('policy.none')}
         </p>
       ) : (
-        policies.map((loaded) => (
-          <PolicyCard
-            key={loaded.policy.id}
-            loaded={loaded}
-            snapshot={snapshot}
-            onRemove={() => void remove(loaded.policy.id)}
-          />
-        ))
+        <div className="policy-grid">
+          {policies.map((loaded) => (
+            <PolicyCard
+              key={loaded.policy.id}
+              loaded={loaded}
+              snapshot={snapshot}
+              onRemove={() => void remove(loaded.policy.id)}
+            />
+          ))}
+        </div>
       )}
     </section>
   );
@@ -565,9 +681,14 @@ export function StatementImportPanel({ onChanged }: { onChanged: () => void }) {
 
   return (
     <section className="card" data-testid="statement-panel">
-      <h3>{t('statement.title')}</h3>
-      <div className="actions upload-row">
-        <label className="file-button">
+      <CardTitle
+        icon="upload"
+        title={t('statement.title')}
+        sub="A file with any bad row is rejected whole; nothing is guessed."
+      />
+      <div className="upload-row">
+        <label className="dropzone">
+          <Icon name="upload" size={20} />
           <span>{t('statement.upload')}</span>
           <input
             type="file"
@@ -577,21 +698,24 @@ export function StatementImportPanel({ onChanged }: { onChanged: () => void }) {
             onChange={upload}
           />
         </label>
-        {SAMPLE_STATEMENTS.map((sample) => (
-          <button
-            key={sample.file}
-            type="button"
-            data-testid={sample.testId}
-            disabled={busy}
-            onClick={() => void loadSample(sample.file)}
-          >
-            {sample.label}
-          </button>
-        ))}
+        <div className="samples">
+          {SAMPLE_STATEMENTS.map((sample) => (
+            <button
+              key={sample.file}
+              type="button"
+              data-testid={sample.testId}
+              disabled={busy}
+              className={sample.file.includes('tampered') ? 'sample sample-attack' : 'sample'}
+              onClick={() => void loadSample(sample.file)}
+            >
+              <Icon name={sample.file.includes('tampered') ? 'alert' : 'file'} size={16} />
+              {sample.label}
+            </button>
+          ))}
+        </div>
       </div>
       <p className="muted small">
-        Columns: <code>date,description,amount,balance,account</code>. A file with any bad row is rejected
-        whole; nothing is guessed.
+        Columns: <code>date,description,amount,balance,account</code>.
       </p>
 
       {prepared && !prepared.ok ? (

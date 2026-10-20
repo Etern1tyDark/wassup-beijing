@@ -219,7 +219,7 @@ describe('dashboard (DASH-1, FC-4, ACT-6)', () => {
     await user.click(screen.getByTestId('earmark-submit'));
 
     expect(await screen.findByTestId('approval-summary')).toHaveTextContent('Set aside Rp 5.000.000');
-    expect(screen.getByTestId('approval-diff')).toHaveTextContent(/Runway2\.7 → \d+(\.\d)? months/);
+    expect(screen.getByTestId('approval-diff')).toHaveTextContent(/Runway2\.7 months↓ \d+(\.\d)? months/);
     expect(screen.getByTestId('runway-days')).toHaveTextContent('80 days');
 
     await waitFor(() => expect(screen.getByTestId('approve')).toBeEnabled());
