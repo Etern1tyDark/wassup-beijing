@@ -195,7 +195,6 @@ a figure no tool returned or that ranks one policy over another.
 
 ## What is not built
 
-- **A run against a hosted model.** See above. It needs a provider and an API key.
 - **Policy layouts other than numbered clauses.** The extractor is rule-based: it reads
   documents laid out as "Clause 4. Title. Text…", which is how the two synthetic policies are
   written. Anything else is rejected with a reason rather than guessed at. The PRD's component
