@@ -40,7 +40,7 @@ test('golden path: statement, policy, shortfall, earmark, undo, refusal, privacy
     await step();
   };
 
-  await page.goto('/');
+  await page.goto('/#/demo');
   await page.getByTestId('load-seed').click();
   await expect(page.getByTestId('runway-days')).toHaveText('80 days');
   await expect(page.getByTestId('alerts')).toContainText('overdue invoice(s)');
@@ -118,7 +118,7 @@ test('golden path: statement, policy, shortfall, earmark, undo, refusal, privacy
 });
 
 test('the numbers survive a reload', async ({ page }) => {
-  await page.goto('/');
+  await page.goto('/#/demo');
   await page.getByTestId('load-seed').click();
   await expect(page.getByTestId('runway-days')).toHaveText('80 days');
   const safe = (await page.getByTestId('safe-to-spend').textContent()) ?? '';

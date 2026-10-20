@@ -11,7 +11,10 @@ import { createContext, useContext } from 'react';
 export type Language = 'en' | 'id';
 
 const STRINGS = {
-  'app.title': { en: 'Permissioned personal-finance agent', id: 'Agen keuangan pribadi berizin' },
+  'app.title': {
+    en: 'Stonks · permissioned personal-finance agent',
+    id: 'Stonks · agen keuangan pribadi berizin',
+  },
   'app.tagline': {
     en: 'Local-first demo · every action needs approval · every action is logged · no real money moves',
     id: 'Demo lokal · setiap aksi butuh persetujuan · setiap aksi dicatat · tidak ada uang sungguhan yang berpindah',
@@ -24,7 +27,7 @@ const STRINGS = {
     id: 'Muat data contoh untuk persona demo agar saldo, daya tahan kas, cakupan polis dan log audit tampil.',
   },
   'app.language': { en: 'Bahasa Indonesia', id: 'English' },
-  'app.brand': { en: 'Wassup Ledger', id: 'Wassup Ledger' },
+  'app.brand': { en: 'Stonks', id: 'Stonks' },
   'app.brandSub': { en: 'Permissioned finance agent', id: 'Agen keuangan berizin' },
   'app.asOf': { en: 'As of', id: 'Per' },
   'app.localFirst': { en: 'Ledger stays on this device', id: 'Buku kas tetap di perangkat ini' },
@@ -60,41 +63,154 @@ const STRINGS = {
     id: 'Setiap aksi di log berantai hash, setiap permintaan keluar terlihat.',
   },
 
-  'landing.eyebrow': { en: 'FinTechathon 2026 · local-first demo', id: 'FinTechathon 2026 · demo lokal' },
-  'landing.title': {
-    en: 'A finance agent that asks before it acts.',
-    id: 'Agen keuangan yang bertanya sebelum bertindak.',
-  },
-  'landing.cta': { en: 'Explore with demo data', id: 'Jelajahi dengan data contoh' },
+  'landing.cta': { en: 'Load the demo data', id: 'Muat data contoh' },
   'landing.ctaNote': {
     en: 'Synthetic data for the persona Rina. No account, no API key, no network.',
     id: 'Data sintetis untuk persona Rina. Tanpa akun, tanpa kunci API, tanpa jaringan.',
   },
-  'landing.p1Title': { en: 'Stays on your device', id: 'Tetap di perangkat Anda' },
-  'landing.p1Body': {
-    en: 'The ledger lives in this browser. Only redacted text ever leaves, and you see every byte.',
-    id: 'Buku kas ada di peramban ini. Hanya teks yang disamarkan yang keluar, dan Anda melihat setiap bitnya.',
+
+  'home.navFeatures': { en: 'Features', id: 'Fitur' },
+  'home.navHow': { en: 'How it works', id: 'Cara kerja' },
+  'home.navSecurity': { en: 'Security', id: 'Keamanan' },
+  'home.launch': { en: 'Launch demo', id: 'Buka demo' },
+  'home.openDashboard': { en: 'Open your dashboard', id: 'Buka dasbor Anda' },
+  'home.badge': {
+    en: 'FinTechathon 2026 · AI as a financial participant',
+    id: 'FinTechathon 2026 · AI sebagai pelaku keuangan',
   },
-  'landing.p2Title': { en: 'You approve every change', id: 'Anda menyetujui setiap perubahan' },
-  'landing.p2Body': {
-    en: 'Each action is tiered, checked against guardrails and shown as a before-and-after card.',
-    id: 'Setiap aksi diberi tingkat, diperiksa pagar pengaman dan ditampilkan sebagai kartu sebelum-sesudah.',
+  'home.titleLead': { en: 'The money agent that', id: 'Agen keuangan yang' },
+  'home.titleAccent': { en: 'asks before it acts.', id: 'bertanya sebelum bertindak.' },
+  'home.lede': {
+    en: 'Stonks forecasts your runway, reads your insurance policy clause by clause and proposes changes you approve with one press. Every action is logged, reversible and stays on your device.',
+    id: 'Stonks memproyeksikan daya tahan kas Anda, membaca polis asuransi per klausul dan mengusulkan perubahan yang Anda setujui dengan satu tekan. Setiap aksi tercatat, bisa dibatalkan, dan tetap di perangkat Anda.',
   },
-  'landing.p3Title': { en: 'Logged and reversible', id: 'Tercatat dan bisa dibatalkan' },
-  'landing.p3Body': {
-    en: 'An append-only, hash-chained audit log you can verify, export and undo from.',
-    id: 'Log audit berantai hash yang hanya bisa ditambah, bisa diverifikasi, diekspor dan dibatalkan.',
+  'home.ctaSecondary': { en: 'See how it works', id: 'Lihat cara kerjanya' },
+  'home.trust1': { en: 'No account', id: 'Tanpa akun' },
+  'home.trust2': { en: 'No API key', id: 'Tanpa kunci API' },
+  'home.trust3': {
+    en: 'Your ledger never leaves the browser',
+    id: 'Buku kas tidak pernah keluar dari peramban',
   },
-  'landing.tiersTitle': { en: 'Three permission tiers', id: 'Tiga tingkat izin' },
-  'landing.t1': { en: 'Read and explain. Runs freely.', id: 'Membaca dan menjelaskan. Berjalan bebas.' },
-  'landing.t2': {
+  'home.previewLabel': {
+    en: 'Preview of an approval card in the demo',
+    id: 'Pratinjau kartu persetujuan di demo',
+  },
+  'home.previewChain': { en: 'Audit chain verified', id: 'Rantai audit terverifikasi' },
+  'home.days': { en: 'days', id: 'hari' },
+
+  'home.stat1': { en: 'acceptance checks pass', id: 'pemeriksaan penerimaan lolos' },
+  'home.stat2': { en: 'judged attack tests blocked', id: 'uji serangan yang dinilai diblokir' },
+  'home.stat3': { en: 'ledger rows sent to the model', id: 'baris buku kas dikirim ke model' },
+  'home.stat4': { en: 'actions for the whole golden path', id: 'aksi untuk seluruh alur utama' },
+
+  'home.featuresTitle': {
+    en: 'Everything a careful money agent needs',
+    id: 'Semua yang dibutuhkan agen keuangan yang hati-hati',
+  },
+  'home.featuresSub': {
+    en: 'Built for freelancers with irregular income: late clients, a policy nobody has read, and no room for surprises.',
+    id: 'Dibuat untuk pekerja lepas berpenghasilan tidak tetap: klien yang telat bayar, polis yang belum dibaca, dan tanpa ruang untuk kejutan.',
+  },
+  'home.f1Title': { en: 'A runway you can trust', id: 'Daya tahan kas yang bisa dipercaya' },
+  'home.f1Body': {
+    en: 'A 90-day forecast in whole rupiah. Overdue invoices are never counted as income, and every figure shows its inputs.',
+    id: 'Proyeksi 90 hari dalam rupiah utuh. Tagihan yang telat tidak pernah dihitung sebagai pemasukan, dan setiap angka menunjukkan inputnya.',
+  },
+  'home.f2Title': { en: 'Your policy, read for you', id: 'Polis Anda, dibacakan untuk Anda' },
+  'home.f2Body': {
+    en: 'Limits, co-payments and waiting periods pulled from the PDF in your browser, each with its page and clause.',
+    id: 'Batas, biaya bersama dan masa tunggu diambil dari PDF di peramban Anda, masing-masing dengan halaman dan klausulnya.',
+  },
+  'home.f3Title': { en: 'Every change is a card', id: 'Setiap perubahan adalah kartu' },
+  'home.f3Body': {
+    en: 'The agent proposes. You see the exact before and after, the guardrails it passed and when it expires, then you approve.',
+    id: 'Agen mengusulkan. Anda melihat sebelum dan sesudahnya, pagar pengaman yang dilewati dan masa berlakunya, lalu Anda menyetujui.',
+  },
+  'home.f4Title': { en: 'Undo anything', id: 'Batalkan apa saja' },
+  'home.f4Body': {
+    en: 'Every ledger change can be reversed under the same limits, and the original entry stays in the log.',
+    id: 'Setiap perubahan buku kas bisa dibatalkan dengan batas yang sama, dan entri aslinya tetap ada di log.',
+  },
+  'home.f5Title': { en: 'See every byte that leaves', id: 'Lihat setiap bit yang keluar' },
+  'home.f5Body': {
+    en: 'Names, NIK, phone and account numbers are removed before any request, and the Privacy panel shows the exact payload.',
+    id: 'Nama, NIK, nomor telepon dan rekening dihapus sebelum permintaan apa pun, dan panel Privasi menampilkan isinya persis.',
+  },
+  'home.f6Title': { en: 'Tamper-evident history', id: 'Riwayat anti-rusak' },
+  'home.f6Body': {
+    en: 'A SHA-256 hash chain of every proposal, approval, refusal and undo, exportable and verifiable offline.',
+    id: 'Rantai hash SHA-256 dari setiap usulan, persetujuan, penolakan dan pembatalan, bisa diekspor dan diverifikasi luring.',
+  },
+
+  'home.howTitle': {
+    en: 'From a question to an approved action in three steps',
+    id: 'Dari pertanyaan ke aksi yang disetujui dalam tiga langkah',
+  },
+  'home.step1Title': { en: 'Ask', id: 'Tanya' },
+  'home.step1Body': {
+    en: '“Set aside money for medical costs.” The agent reads your ledger and policy through read-only tools.',
+    id: '“Sisihkan uang untuk biaya medis.” Agen membaca buku kas dan polis Anda melalui alat baca-saja.',
+  },
+  'home.step2Title': { en: 'Review', id: 'Tinjau' },
+  'home.step2Body': {
+    en: 'A card shows what would change (safe to spend, free cash, runway) and every guardrail it passed.',
+    id: 'Kartu menampilkan apa yang akan berubah (aman dibelanjakan, kas bebas, daya tahan kas) dan setiap pagar pengaman yang dilewati.',
+  },
+  'home.step3Title': { en: 'Approve', id: 'Setujui' },
+  'home.step3Body': {
+    en: 'One press runs it through the only ledger writer. It is logged, and one more press undoes it.',
+    id: 'Satu tekan menjalankannya lewat satu-satunya penulis buku kas. Tercatat, dan satu tekan lagi membatalkannya.',
+  },
+
+  'home.secEyebrow': { en: 'Security by construction', id: 'Aman sejak rancangan' },
+  'home.secTitle': {
+    en: 'Security lives in code, not in the prompt',
+    id: 'Keamanan ada di kode, bukan di prompt',
+  },
+  'home.secBody': {
+    en: 'The model can only read and propose. A fixed registry decides the tier of every action, guardrails run twice, and approvals use one-time tokens bound to the exact proposal.',
+    id: 'Model hanya bisa membaca dan mengusulkan. Registri tetap menentukan tingkat setiap aksi, pagar pengaman berjalan dua kali, dan persetujuan memakai token sekali pakai yang terikat pada usulan itu.',
+  },
+  'home.sec1': {
+    en: 'Hidden instructions in PDFs, CSVs and pasted text are flagged and can never set an amount or an account.',
+    id: 'Instruksi tersembunyi di PDF, CSV dan teks tempelan ditandai dan tidak pernah bisa menentukan jumlah atau rekening.',
+  },
+  'home.sec2': {
+    en: 'Every number in a reply must come from a tool result, or the reply is withheld.',
+    id: 'Setiap angka dalam balasan harus berasal dari hasil alat, atau balasan ditahan.',
+  },
+  'home.sec3': {
+    en: 'Moving money is refused. A simulation exists only behind a PIN, between your own accounts.',
+    id: 'Memindahkan uang ditolak. Simulasi hanya ada di balik PIN, antar rekening Anda sendiri.',
+  },
+  'home.sec4': {
+    en: 'Tested against a deliberately compromised model: it still cannot act.',
+    id: 'Diuji melawan model yang sengaja dibobol: tetap tidak bisa bertindak.',
+  },
+  'home.tiersTitle': { en: 'Four permission tiers', id: 'Empat tingkat izin' },
+  'home.tier0': { en: 'Read and explain. Runs freely.', id: 'Membaca dan menjelaskan. Berjalan bebas.' },
+  'home.tier1': { en: 'Draft text. Nothing is sent.', id: 'Menyusun teks. Tidak ada yang dikirim.' },
+  'home.tier2': {
     en: 'Reversible ledger changes. Needs your Approve.',
     id: 'Perubahan buku kas yang bisa dibatalkan. Butuh persetujuan Anda.',
   },
-  'landing.t3': {
-    en: 'Money movement. Simulated only, behind a PIN.',
-    id: 'Perpindahan uang. Hanya simulasi, dengan PIN.',
+  'home.tier3': {
+    en: 'Money movement. Refused; simulated only, behind a PIN.',
+    id: 'Perpindahan uang. Ditolak; hanya simulasi, dengan PIN.',
   },
+
+  'home.ctaTitle': { en: 'See it run on a real month', id: 'Lihat jalannya pada satu bulan nyata' },
+  'home.ctaBody': {
+    en: 'Explore Rina’s synthetic ledger: a late client, a health policy and a hospital-stay question. No sign-up.',
+    id: 'Jelajahi buku kas sintetis Rina: klien yang telat bayar, polis kesehatan dan pertanyaan rawat inap. Tanpa daftar.',
+  },
+  'home.footer': {
+    en: 'Built for FinTechathon 2026 · International Track · All data is synthetic · No real money moves.',
+    id: 'Dibuat untuk FinTechathon 2026 · Jalur Internasional · Semua data sintetis · Tidak ada uang sungguhan yang berpindah.',
+  },
+
+  'nav.home': { en: 'Home', id: 'Beranda' },
+  'app.backHome': { en: 'Back to home', id: 'Kembali ke beranda' },
 
   'approval.queue': { en: 'Approvals', id: 'Persetujuan' },
   'approval.waiting': { en: 'waiting', id: 'menunggu' },

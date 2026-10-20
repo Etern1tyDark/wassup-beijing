@@ -24,6 +24,8 @@ import type {
 export const LEDGER_TABLES = ['accounts', 'transactions', 'invoices', 'obligations', 'earmarks'] as const;
 export type LedgerTableName = (typeof LEDGER_TABLES)[number];
 
+// Kept from the project's working name, so a browser that already holds the demo
+// ledger keeps it after the rename to Stonks.
 export const DATABASE_NAME = 'wassup-beijing';
 
 export class AppDatabase extends Dexie {

@@ -23,6 +23,8 @@ import { PolicyPanel, RunwayPanel, StatementImportPanel } from './DashboardPanel
 import { Icon, type IconName } from './icons';
 import { useTheme } from './theme';
 import { CardTitle } from './ui-kit';
+import { BrandMark, HomePage } from './HomePage';
+import { href, scrollToSection, useRoute } from './route';
 import seedFixture from '../../fixtures/seed/rina.json';
 import './styles.css';
 
@@ -1098,18 +1100,17 @@ function useActiveSection(enabled: boolean): SectionId {
   return active;
 }
 
+/** The logo, which always leads back to the home page. */
 function Brand() {
   const t = useT();
   return (
-    <div className="brand">
-      <span className="brand-mark" aria-hidden="true">
-        W
-      </span>
+    <a className="brand brand-link" href={href('home')} aria-label={`${t('app.brand')} · ${t('nav.home')}`}>
+      <BrandMark />
       <span className="brand-text">
         <strong>{t('app.brand')}</strong>
         <span>{t('app.brandSub')}</span>
       </span>
-    </div>
+    </a>
   );
 }
 
@@ -1123,7 +1124,8 @@ function Sidebar({ active, badges }: { active: SectionId; badges: Partial<Record
           {SECTIONS.map((section) => (
             <li key={section.id}>
               <a
-                href={`#${section.id}`}
+                href={href('demo', section.id)}
+                onClick={() => scrollToSection(section.id)}
                 className={active === section.id ? 'nav-link is-active' : 'nav-link'}
                 aria-current={active === section.id ? 'location' : undefined}
               >
@@ -1139,6 +1141,10 @@ function Sidebar({ active, badges }: { active: SectionId; badges: Partial<Record
           ))}
         </ul>
       </nav>
+      <a className="nav-link nav-home" href={href('home')} data-testid="sidebar-home">
+        <Icon name="undo" />
+        <span>{t('app.backHome')}</span>
+      </a>
       <div className="sidebar-foot">
         <p>
           <Icon name="lock" size={14} /> {t('app.localFirst')}
@@ -1161,6 +1167,10 @@ function Topbar({ onLoadSeed }: { onLoadSeed: () => void }) {
     <header className="topbar">
       <div className="topbar-left">
         {state.loaded ? null : <Brand />}
+        <a className="btn btn-ghost" href={href('home')} data-testid="go-home">
+          <Icon name="undo" size={16} />
+          <span className="btn-label">{t('nav.home')}</span>
+        </a>
         {state.snapshot ? (
           <span className="chip-status">
             <span className="dot" aria-hidden="true" />
@@ -1196,55 +1206,27 @@ function Topbar({ onLoadSeed }: { onLoadSeed: () => void }) {
   );
 }
 
-const PROMISES: Array<{ icon: IconName; title: StringKey; body: StringKey }> = [
-  { icon: 'lock', title: 'landing.p1Title', body: 'landing.p1Body' },
-  { icon: 'shield', title: 'landing.p2Title', body: 'landing.p2Body' },
-  { icon: 'log', title: 'landing.p3Title', body: 'landing.p3Body' },
-];
-
-const TIERS: Array<{ tier: string; text: StringKey }> = [
-  { tier: 'T1', text: 'landing.t1' },
-  { tier: 'T2', text: 'landing.t2' },
-  { tier: 'T3', text: 'landing.t3' },
-];
-
-function Landing({ onLoadSeed }: { onLoadSeed: () => void }) {
+/** The demo before any data is loaded: one button, and a way back home. */
+function DemoEmpty({ onLoadSeed }: { onLoadSeed: () => void }) {
   const t = useT();
   return (
-    <section className="landing" data-testid="empty-state">
-      <div className="landing-hero">
-        <p className="eyebrow">{t('landing.eyebrow')}</p>
-        <p className="landing-title">{t('landing.title')}</p>
+    <section className="demo-empty" data-testid="empty-state">
+      <div className="demo-empty-card">
+        <span className="consent-icon" aria-hidden="true">
+          <Icon name="sparkle" size={22} />
+        </span>
         <h2>{t('app.emptyTitle')}</h2>
-        <p className="landing-body">{t('app.emptyBody')}</p>
+        <p className="muted">{t('app.emptyBody')}</p>
         <div className="actions">
           <button type="button" className="primary large" data-testid="load-seed-hero" onClick={onLoadSeed}>
             <Icon name="sparkle" size={18} />
             {t('landing.cta')}
           </button>
+          <a className="btn btn-large" href={href('home')}>
+            {t('app.backHome')}
+          </a>
         </div>
         <p className="muted small">{t('landing.ctaNote')}</p>
-      </div>
-      <ul className="promises">
-        {PROMISES.map((promise) => (
-          <li key={promise.title} className="card promise">
-            <span className="card-icon" aria-hidden="true">
-              <Icon name={promise.icon} />
-            </span>
-            <strong>{t(promise.title)}</strong>
-            <p className="muted small">{t(promise.body)}</p>
-          </li>
-        ))}
-      </ul>
-      <div className="card tiers">
-        <strong>{t('landing.tiersTitle')}</strong>
-        <ol>
-          {TIERS.map((item) => (
-            <li key={item.tier}>
-              <span className={`tier tier-${item.tier.toLowerCase()}`}>{item.tier}</span> {t(item.text)}
-            </li>
-          ))}
-        </ol>
       </div>
     </section>
   );
@@ -1272,7 +1254,17 @@ export function App() {
   const [earmarkNotice, setEarmarkNotice] = useState<string | null>(null);
   const [conversation, setConversation] = useState(0);
   const pendingGroups = groupByRisk(state.pending);
-  const active = useActiveSection(state.loaded);
+  const route = useRoute();
+  const inDemo = route.page === 'demo';
+  const active = useActiveSection(inDemo && state.loaded);
+
+  // A new route starts at its section, or at the top of the page.
+  useEffect(() => {
+    const frame = globalThis.requestAnimationFrame?.(() => scrollToSection(route.section));
+    return () => {
+      if (frame !== undefined) globalThis.cancelAnimationFrame?.(frame);
+    };
+  }, [route.page, route.section, state.loaded]);
 
   const loadSeed = async () => {
     setLoadNotice(null);
@@ -1302,6 +1294,8 @@ export function App() {
     reload();
   };
 
+  if (!inDemo) return <HomePage hasData={state.loaded} />;
+
   return (
     <div className={state.loaded ? 'shell' : 'shell shell-landing'}>
       {state.loaded ? (
@@ -1323,7 +1317,7 @@ export function App() {
           ) : null}
 
           {!state.loaded ? (
-            <Landing onLoadSeed={() => void loadSeed()} />
+            <DemoEmpty onLoadSeed={() => void loadSeed()} />
           ) : (
             <>
               {/* DASH-1: runway, policy coverage and the audit log on one page. */}

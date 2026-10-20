@@ -1,4 +1,4 @@
-# Security self-assessment
+# Security self-assessment: Stonks
 
 What the agent is allowed to do, what stops it from doing more, how each control is tested,
 and what is still a risk. Requirement and test ids (ACT-3, ST2, …) refer to

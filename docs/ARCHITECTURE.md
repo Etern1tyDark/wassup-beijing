@@ -1,6 +1,6 @@
 # Architecture
 
-A local-first personal-finance agent with permission tiers. Everything runs in the browser;
+Stonks is a local-first personal-finance agent with permission tiers. Everything runs in the browser;
 one stateless relay function holds the model API key and forwards already-redacted requests.
 
 Requirement ids (ING-1, ACT-3, LED-2, …) refer to `docs/PRD.md`.

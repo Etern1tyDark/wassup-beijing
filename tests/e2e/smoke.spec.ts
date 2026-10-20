@@ -10,7 +10,7 @@ test('app loads, seed data shows, earmark approve and undo work', async ({ page 
     if (message.type() === 'error') consoleErrors.push(message.text());
   });
 
-  await page.goto('/');
+  await page.goto('/#/demo');
 
   // Empty state until the demo data is loaded.
   await expect(page.getByTestId('empty-state')).toBeVisible();

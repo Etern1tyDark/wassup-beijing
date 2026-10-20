@@ -4,7 +4,7 @@ Oct 13, 2026 · @ana
 
 ## 1. Overview
 
-We will ship a local-first personal-finance agent that turns a cash-flow forecast and an insurance coverage check into one approved, logged and reversible action, submitted by 20 Oct 2026. It competes in Topic A (Personal Finance Assistant) of the FinTechathon International Track, with the coverage check (Topic D) and the late-invoice scenario (Topic E) as supporting features. The product name is still open; this document calls it "the agent".
+We will ship a local-first personal-finance agent that turns a cash-flow forecast and an insurance coverage check into one approved, logged and reversible action, submitted by 20 Oct 2026. It competes in Topic A (Personal Finance Assistant) of the FinTechathon International Track, with the coverage check (Topic D) and the late-invoice scenario (Topic E) as supporting features. The product is named **Stonks**; this document calls it "the agent".
 
 **Problem.** People with irregular income, such as freelancers, cannot see whether a late payment or a medical shock would break their budget. AI finance tools either only analyse (ChatGPT Finances and Perplexity are read-only) or act inside a closed cloud service (Cleo describes execution as its next stage). Insurance readers explain a policy but do not check it against the user's cash.
 

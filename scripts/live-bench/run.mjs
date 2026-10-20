@@ -93,7 +93,7 @@ async function benchOnce(browser) {
   const page = await context.newPage();
   page.setDefaultTimeout(180_000);
 
-  await page.goto(`${APP}/`);
+  await page.goto(`${APP}/#/demo`);
   await page.getByTestId('load-seed').click();
   await page.getByTestId('runway-days').waitFor();
   await page.getByTestId('sample-policy-health').click();

@@ -1,7 +1,7 @@
 {
-  "name": "Permissioned personal-finance agent",
-  "short_name": "Ledger agent",
-  "description": "Local-first personal-finance agent with permission tiers, approvals and an append-only audit log.",
+  "name": "Stonks · Permissioned personal-finance agent",
+  "short_name": "Stonks",
+  "description": "Stonks: a local-first personal-finance agent with permission tiers, approvals and an append-only audit log.",
   "start_url": "/",
   "scope": "/",
   "display": "standalone",

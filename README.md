@@ -21,7 +21,8 @@ append-only, hash-chained audit log. **No real money moves anywhere in this code
 npm install && npm run dev
 ```
 
-Then open <http://localhost:5173> and press **Load seed data**. That writes the deterministic
+Then open <http://localhost:5173>, press **Launch demo** on the home page (or go straight to
+<http://localhost:5173/#/demo>) and press **Load seed data**. That writes the deterministic
 synthetic dataset for the demo persona (Rina) into IndexedDB and anchors the demo clock to its
 as-of date, 2026-10-13. No API key, no network and no account are needed: the chat is answered
 by a rule-based stand-in for the model that runs in the browser.
@@ -106,7 +107,7 @@ npm run format:check && npm run lint && npm run lint:boundary && npm run typeche
 
 ## Tests
 
-386 unit, integration, acceptance and UI tests, plus three end-to-end tests in a real browser.
+398 unit, integration, acceptance and UI tests, plus four end-to-end tests in a real browser.
 
 The acceptance scripts in PRD Section 12 are tests with the same names:
 `src/acceptance/scripts.test.ts` runs S1 to S8, I1 to I3 and ST1 to ST8 against the whole
@@ -114,30 +115,30 @@ application (seeded ledger, the real policy PDFs, tier engine, audit log, outbou
 rule-based model), and `tests/e2e/golden-path.spec.ts` runs the golden path and I4 in Chromium.
 `npm run evidence` writes the results table to [`evidence/results.md`](evidence/results.md).
 
-| Area              | File(s)                                                 | Covers                                                              |
-| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------- |
-| Acceptance        | `src/acceptance/scripts.test.ts`                        | S1 to S8, I1 to I3, ST1 to ST8, and the controls on the model reply |
-| Recorded run      | `src/acceptance/evidence.test.ts`                       | Golden path plus attacks; the exported audit log verifies           |
-| Money             | `src/domain/money.test.ts`                              | Floats and unsafe integers are rejected; no float arithmetic        |
-| Ledger            | `src/ledger/engine.test.ts`                             | Hand-worked fixture: balances, free cash, safe-to-spend             |
-| Forecast          | `src/forecast/forecast.test.ts`                         | Hand-worked fixture to the rupiah: projection, runway, scenarios    |
-| Policy            | `src/policy/policy.test.ts`                             | PDF reading, extraction with citations, coverage, comparison, ST2   |
-| CSV import        | `src/importers/csv.test.ts`                             | Valid fixture loads; bad rows get a line number and a reason        |
-| Ledger entry      | `src/actions/ledger-entry.test.ts`                      | Statement import and chat-entered transactions through approval     |
-| Earmark editing   | `src/actions/earmark-update.test.ts`                    | Edit with guardrails and undo; queue cap; proposal expiry           |
-| Approval grouping | `src/actions/risk.test.ts`                              | Which proposals may share a card                                    |
-| Undo limits       | `src/actions/undo-guardrails.test.ts`                   | An undo passes the same limits as the change it makes               |
-| Taint             | `src/agent/taint.test.ts`                               | A paste or a tampered document cannot launder a proposal            |
-| Tier engine       | `src/actions/service.test.ts`, `guardrails.test.ts`     | Approval lifecycle, tokens, guardrails, provenance, T3, staleness   |
-| Edge fixtures     | `src/actions/edge-fixtures.test.ts`                     | Earmark over free cash, stale data, malformed CSVs                  |
-| Audit log         | `src/audit/log.test.ts`, `src/audit/verify-cli.test.ts` | Chain verifies; tampering, deletion and insertion all fail          |
-| Write boundary    | `src/storage/ledger-write-boundary.test.ts`             | LED-3                                                               |
-| Outbound gate     | `src/gate/gate.test.ts`                                 | Redactor removes every identifier type; block decisions honoured    |
-| Agent             | `src/agent/agent.test.ts`                               | Tools propose but never approve; request parsing; number check      |
-| Hosted model      | `src/agent/relay-model.test.ts`, `relay/*.test.ts`      | Relay translation, retries, rate limit; plus a live run (see below) |
-| Seed determinism  | `scripts/seed/generator.test.ts`                        | Same seed, same hash; PRD shape checks                              |
-| UI                | `src/ui/App.test.tsx`                                   | Dashboard, upload of real PDFs and CSVs, chat, consent, approvals   |
-| End to end        | `tests/e2e/*.spec.ts`                                   | Golden path in 6 actions, reload, no request leaves the origin      |
+| Area              | File(s)                                                 | Covers                                                                                |
+| ----------------- | ------------------------------------------------------- | ------------------------------------------------------------------------------------- |
+| Acceptance        | `src/acceptance/scripts.test.ts`                        | S1 to S8, I1 to I3, ST1 to ST8, and the controls on the model reply                   |
+| Recorded run      | `src/acceptance/evidence.test.ts`                       | Golden path plus attacks; the exported audit log verifies                             |
+| Money             | `src/domain/money.test.ts`                              | Floats and unsafe integers are rejected; no float arithmetic                          |
+| Ledger            | `src/ledger/engine.test.ts`                             | Hand-worked fixture: balances, free cash, safe-to-spend                               |
+| Forecast          | `src/forecast/forecast.test.ts`                         | Hand-worked fixture to the rupiah: projection, runway, scenarios                      |
+| Policy            | `src/policy/policy.test.ts`                             | PDF reading, extraction with citations, coverage, comparison, ST2                     |
+| CSV import        | `src/importers/csv.test.ts`                             | Valid fixture loads; bad rows get a line number and a reason                          |
+| Ledger entry      | `src/actions/ledger-entry.test.ts`                      | Statement import and chat-entered transactions through approval                       |
+| Earmark editing   | `src/actions/earmark-update.test.ts`                    | Edit with guardrails and undo; queue cap; proposal expiry                             |
+| Approval grouping | `src/actions/risk.test.ts`                              | Which proposals may share a card                                                      |
+| Undo limits       | `src/actions/undo-guardrails.test.ts`                   | An undo passes the same limits as the change it makes                                 |
+| Taint             | `src/agent/taint.test.ts`                               | A paste or a tampered document cannot launder a proposal                              |
+| Tier engine       | `src/actions/service.test.ts`, `guardrails.test.ts`     | Approval lifecycle, tokens, guardrails, provenance, T3, staleness                     |
+| Edge fixtures     | `src/actions/edge-fixtures.test.ts`                     | Earmark over free cash, stale data, malformed CSVs                                    |
+| Audit log         | `src/audit/log.test.ts`, `src/audit/verify-cli.test.ts` | Chain verifies; tampering, deletion and insertion all fail                            |
+| Write boundary    | `src/storage/ledger-write-boundary.test.ts`             | LED-3                                                                                 |
+| Outbound gate     | `src/gate/gate.test.ts`                                 | Redactor removes every identifier type; block decisions honoured                      |
+| Agent             | `src/agent/agent.test.ts`                               | Tools propose but never approve; request parsing; number check                        |
+| Hosted model      | `src/agent/relay-model.test.ts`, `relay/*.test.ts`      | Relay translation, retries, rate limit; plus a live run (see below)                   |
+| Seed determinism  | `scripts/seed/generator.test.ts`                        | Same seed, same hash; PRD shape checks                                                |
+| UI                | `src/ui/App.test.tsx`                                   | Dashboard, upload of real PDFs and CSVs, chat, consent, approvals                     |
+| End to end        | `tests/e2e/*.spec.ts`                                   | Golden path in 6 actions, reload, home to demo and back, no request leaves the origin |
 
 ## Architecture in one paragraph
 

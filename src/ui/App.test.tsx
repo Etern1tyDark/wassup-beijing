@@ -20,7 +20,9 @@ import badRows from '../../fixtures/csv/bad-rows.csv?raw';
  */
 const services: AppServices[] = [];
 
-function setup(): AppServices {
+function setup(hash = '#/demo'): AppServices {
+  // The dashboard lives at #/demo; the home page at #/ has no ledger panels.
+  window.location.hash = hash;
   const created = createAppServices({
     databaseName: `ui-test-${Math.random().toString(16).slice(2)}`,
     persistClock: false,
@@ -63,6 +65,7 @@ async function ask(user: ReturnType<typeof userEvent.setup>, message: string): P
 afterEach(async () => {
   cleanup();
   localStorage.clear();
+  window.location.hash = '';
   while (services.length > 0) {
     const current = services.pop();
     if (current) {
@@ -70,6 +73,39 @@ afterEach(async () => {
       await current.db.delete();
     }
   }
+});
+
+describe('home page and navigation', () => {
+  it('opens on the home page, launches the demo and comes back', async () => {
+    const user = userEvent.setup();
+    setup('');
+
+    expect(screen.getByTestId('home')).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('asks before it acts');
+    expect(screen.queryByTestId('safe-to-spend')).not.toBeInTheDocument();
+
+    await user.click(screen.getByTestId('launch-demo'));
+    expect(await screen.findByTestId('empty-state')).toBeInTheDocument();
+
+    await user.click(screen.getByTestId('load-seed'));
+    await screen.findByTestId('safe-to-spend');
+
+    // The bug this fixes: once the ledger existed, there was no way back to the home page.
+    await user.click(screen.getByTestId('go-home'));
+    expect(await screen.findByTestId('home')).toBeInTheDocument();
+    expect(screen.getByTestId('launch-demo')).toHaveTextContent('Open your dashboard');
+
+    await user.click(screen.getByTestId('launch-demo'));
+    expect(await screen.findByTestId('safe-to-spend')).toBeInTheDocument();
+  });
+
+  it('keeps the section links inside the demo route', async () => {
+    await seeded();
+    const links = screen.getAllByRole('link').map((link) => link.getAttribute('href'));
+    expect(links).toContain('#/demo/assistant');
+    expect(links).toContain('#/');
+    expect(links.filter((value) => value === '#assistant')).toHaveLength(0);
+  });
 });
 
 describe('UI shell', () => {

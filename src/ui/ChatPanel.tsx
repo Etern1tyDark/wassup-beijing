@@ -17,6 +17,7 @@ import { useT } from './i18n';
 import { useServices } from './services-context';
 import { Icon } from './icons';
 import { CardTitle } from './ui-kit';
+import { href } from './route';
 
 /**
  * Chat (CHAT-1 to CHAT-4). The reply text is short; the numbers live in the
@@ -121,7 +122,7 @@ function ToolCard({ result }: { result: ToolResult }) {
     return (
       <div className="tool-card" data-testid="card-proposal">
         <strong>Waiting for your approval</strong> · {proposal.action} ({proposal.tier}). Nothing has changed.
-        The <a href="#approvals">approval card</a> shows the before and after.
+        The <a href={href('demo', 'approvals')}>approval card</a> shows the before and after.
       </div>
     );
   }

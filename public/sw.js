@@ -4,7 +4,7 @@
  * Only same-origin GET requests are cached, and /api/ (the relay) is never
  * touched, so no user data is ever stored anywhere but this device (NFR-5).
  */
-const CACHE = 'wassup-beijing-v2';
+const CACHE = 'stonks-v3';
 const SHELL = ['/', '/index.html', '/manifest.webmanifest', '/icon.svg'];
 
 self.addEventListener('install', (event) => {

@@ -29,7 +29,7 @@ export interface RelayBindings {
    */
   MODEL_TEMPERATURE?: string;
   /**
-   * The site allowed to call the relay, for example "https://wassup.example".
+   * The site allowed to call the relay, for example "https://stonks.example".
    * When set, a request from any other origin is refused. Leave unset for local
    * development. A deployed relay is otherwise an open proxy to a paid model.
    */
