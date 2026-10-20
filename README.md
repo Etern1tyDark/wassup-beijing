@@ -1,13 +1,13 @@
-# wassup-beijing
+# Stonks
 
-A local-first personal-finance agent with permission tiers, built for the FinTechathon 2026
-International Track (Topic A, with the coverage check and the late-invoice scenario as
-supporting features).
+**A personal-finance agent that can act on your money, but only inside limits you set, with undo.**
 
-The agent can act on your money picture, but only inside limits you set, in the open, with
-undo. The ledger never leaves the browser. Every action is classified into a tier, checked
-against guardrails, approved by a button press and written to an append-only hash-chained log.
-**No real money moves anywhere in this codebase.**
+Built for FinTechathon 2026, International Track, Topic A. A late-invoice scenario and an
+insurance coverage check support the main flow.
+
+Your ledger never leaves the browser. Every action the agent proposes is classified into a
+permission tier, checked against guardrails, approved by you with one press and written to an
+append-only, hash-chained audit log. **No real money moves anywhere in this codebase.**
 
 - Full requirements: [`docs/PRD.md`](docs/PRD.md)
 - How it is put together, and the core algorithms: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
